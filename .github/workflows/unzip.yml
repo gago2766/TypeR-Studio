@@ -1,7 +1,10 @@
 name: Unzip File
 
 on:
-  workflow_dispatch: # يتيح لك تشغيل العملية يدوياً من الهاتف
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Grant write permission to the repository contents
 
 jobs:
   extract:
@@ -12,7 +15,6 @@ jobs:
 
       - name: Unzip the file
         run: |
-          # فك ضغط الملف المحدد إلى مجلد باسم TypeR-Studio-extracted
           unzip -o TypeR-Studio-main.zip -d TypeR-Studio-extracted
 
       - name: Commit and Push changes
