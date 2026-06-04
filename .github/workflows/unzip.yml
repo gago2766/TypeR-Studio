@@ -12,14 +12,13 @@ jobs:
 
       - name: Unzip the file
         run: |
-          # استبدل 'archive.zip' باسم ملفك المضغوط
-          # استبدل 'extracted_folder' باسم المجلد الذي تريد استخراج الملفات إليه
-          unzip -o archive.zip -d extracted_folder
+          # فك ضغط الملف المحدد إلى مجلد باسم TypeR-Studio-extracted
+          unzip -o TypeR-Studio-main.zip -d TypeR-Studio-extracted
 
       - name: Commit and Push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Extract zip file contents" || echo "No changes to commit"
+          git commit -m "Extract TypeR-Studio-main.zip contents" || echo "No changes to commit"
           git push
