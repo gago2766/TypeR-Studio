@@ -1,0 +1,43 @@
+name: Safe Unzip and Move to Root
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract-and-move:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Unzip and move files safely
+        run: |
+          # 1. فك ضغط الملف
+          unzip -o TypeR-Studio-main.zip
+          
+          # 2. حذف مجلد الـ workflows المستخرج لتجنب التعارض ومشاكل الصلاحيات
+          if [ -d "TypeR-Studio-main/.github" ]; then
+            echo "تم العثور على مجلد .github مستخرج، يتم حذفه لتجنب التعارض..."
+            rm -rf TypeR-Studio-main/.github
+          fi
+          
+          # 3. نقل بقية الملفات بأمان إلى المجلد الرئيسي
+          if [ -d "TypeR-Studio-main" ]; then
+            echo "نقل بقية الملفات إلى الخارج..."
+            mv TypeR-Studio-main/* . 2>/dev/null || true
+            mv TypeR-Studio-main/.* . 2>/dev/null || true
+            
+            # حذف المجلد المؤقت الفارغ
+            rm -rf TypeR-Studio-main
+          fi
+
+          # 4. حذف ملف الـ zip الأصلي
+          rm -f TypeR-Studio-main.zip
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Extract files safely to root excluding extracted workflows" || echo "No changes to commit"
+          git push
