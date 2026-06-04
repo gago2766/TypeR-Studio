@@ -3,6 +3,10 @@ name: Safe Unzip and Move to Root
 on:
   workflow_dispatch:
 
+# تمنح هذه الأسطر الأداة صلاحية الكتابة والرفع إلى المستودع لحل مشكلة الإذن 403
+permissions:
+  contents: write
+
 jobs:
   extract-and-move:
     runs-on: ubuntu-latest
@@ -23,7 +27,7 @@ jobs:
           
           # 3. نقل بقية الملفات بأمان إلى المجلد الرئيسي
           if [ -d "TypeR-Studio-main" ]; then
-            echo "نقل بقية الملفات إلى الخارج..."
+            echo "نقل الملفات إلى الخارج..."
             mv TypeR-Studio-main/* . 2>/dev/null || true
             mv TypeR-Studio-main/.* . 2>/dev/null || true
             
