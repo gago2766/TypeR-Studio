@@ -1406,7 +1406,7 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // buckets text layout correctly inside visual area bounds
+  // محاذاة وتوسيط النص ضمن منطقة التحديد اليدوية
   const handleAlignText = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
@@ -2906,7 +2906,7 @@ export default function App() {
                         if (isChecked) {
                           checkedStylesForExport(prev => prev.filter(x => x !== s.id));
                         } else {
-                          setCheckedStylesForExport(prev => [...prev, s.id]);
+                          checkedStylesForExport(prev => [...prev, s.id]);
                         }
                       }}
                       className="accent-[#007acc] shrink-0"
@@ -3304,7 +3304,7 @@ export default function App() {
           watermarkOpacity={watermarkOpacity}
           watermarkPosition={watermarkPosition}
           watermarkSize={watermarkSize}
-          onDuplicateLayer={onDuplicateLayer}
+          onDuplicateLayer={handleDuplicateLayer}
           onSavePresetFromStyle={handleSavePresetFromStyle}
         />
 
