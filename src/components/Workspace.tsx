@@ -219,13 +219,12 @@ export function Workspace({
     };
   }, []);
 
-  // 📱 نظام لمس احترافي متكامل للهواتف (تحكم حر بالفرشاة وتكبير الصفحة وسحب وتعديل النصوص بحرية)
+  // نظام لمس احترافي متكامل للهواتف
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleTouchStartNative = (e: TouchEvent) => {
-      // 1. تكبير وتصغير وتحريك الصفحة (بإصبعين)
       if (e.touches.length === 2) {
         setIsPanning(true);
         const t1 = e.touches[0];
@@ -246,17 +245,14 @@ export function Workspace({
         return;
       }
 
-      // 2. معالجة لمسة الإصبع الواحد
       if (e.touches.length === 1) {
         const touch = e.touches[0];
         const target = e.target as HTMLElement;
 
-        // إذا كان المستخدم يلمس حقول إدخال النص أو الـ contenteditable، لا تقم بالمنع ليتفاعل الكيبورد بشكل طبيعي
         if (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('button')) {
           return;
         }
 
-        // سحب الصفحة بإصبع واحد فقط لأداة اليد (Hand) أو أداة الزوم (Zoom)
         if (activeTool === 'hand' || activeTool === 'zoom') {
           setIsPanning(true);
           setPanStart({
@@ -268,7 +264,6 @@ export function Workspace({
           return;
         }
 
-        // لأي أداة أخرى (مثل الفرشاة أو التحديد)، نمنع سحب الصفحة تماماً لتسهيل الرسم الحر والتحديد
         if (e.cancelable) e.preventDefault();
 
         const wrapper = imageWrapperRef.current;
@@ -277,13 +272,11 @@ export function Workspace({
         const clickX = (touch.clientX - rect.left) / zoom;
         const clickY = (touch.clientY - rect.top) / zoom;
 
-        // دعم تفعيل العصا السحرية باللمس
         if (activeTool === 'magic_wand') {
           onWandSelect(clickX, clickY);
           return;
         }
 
-        // دعم تفعيل التحديد المستطيل باللمس (Marquee Tool)
         if (activeTool === 'marquee') {
           setIsDrawing(true);
           setStartPos({ x: clickX, y: clickY });
@@ -297,7 +290,6 @@ export function Workspace({
           return;
         }
 
-        // الرسم والتبييض المباشر بإصبع واحد
         const drawingTools = ['brush', 'eraser', 'clone_stamp', 'color_picker'];
         if (drawingTools.includes(activeTool)) {
           const img = imageRef.current;
@@ -380,7 +372,6 @@ export function Workspace({
     };
 
     const handleTouchMoveNative = (e: TouchEvent) => {
-      // تحريك وتكبير الصفحة التفاعلي بإصبعين
       if (isPanning && e.touches.length === 2) {
         if (e.cancelable) e.preventDefault();
         const t1 = e.touches[0];
@@ -402,7 +393,6 @@ export function Workspace({
         return;
       }
 
-      // سحب الصفحة لأداة اليد أو الزوم بإصبع واحد
       if (isPanning && (activeTool === 'hand' || activeTool === 'zoom') && e.touches.length === 1) {
         const touch = e.touches[0];
         const dx = touch.clientX - panStart.x;
@@ -412,16 +402,13 @@ export function Workspace({
         return;
       }
 
-      // معالجة حركة الإصبع الواحد للأدوات الأخرى
       if (e.touches.length === 1) {
         const touch = e.touches[0];
 
-        // منع سحب الصفحة تماماً أثناء الرسم أو التعديل لتجنب اهتزاز واجهة اللمس
         if (isDrawing || dragState || proportionalResizeState || rotateState || verticalMoveState || leftStretchState) {
           if (e.cancelable) e.preventDefault();
         }
 
-        // تمديد مستطيل التحديد (Marquee Tool) باللمس
         if (isDrawing && activeTool === 'marquee' && selectionBox) {
           const wrapper = imageWrapperRef.current;
           if (!wrapper) return;
@@ -444,7 +431,6 @@ export function Workspace({
           return;
         }
 
-        // الرسم بإصبع واحد
         if (isDrawing && ['brush', 'eraser', 'clone_stamp'].includes(activeTool)) {
           const wrapper = imageWrapperRef.current;
           if (!wrapper) return;
@@ -511,7 +497,6 @@ export function Workspace({
           return;
         }
 
-        // 3. 📱 سحب وتحريك حر للنصوص باللمس للهواتف
         if (dragState) {
           const dx = (touch.clientX - dragState.startX) / zoom;
           const dy = (touch.clientY - dragState.startY) / zoom;
@@ -525,7 +510,6 @@ export function Workspace({
           return;
         }
 
-        // 4. 📱 تكبير وتصغير حجم صندوق النص والخط باللمس
         if (proportionalResizeState) {
           const dx = (touch.clientX - proportionalResizeState.startX) / zoom;
           const dWidth = dx;
@@ -549,7 +533,6 @@ export function Workspace({
           return;
         }
 
-        // 5. 📱 تدوير حر للنصوص باللمس
         if (rotateState) {
           const currentAngle = Math.atan2(touch.clientY - rotateState.centerY, touch.clientX - rotateState.centerX) * (180 / Math.PI);
           const dAngle = currentAngle - rotateState.startAngle;
@@ -558,7 +541,6 @@ export function Workspace({
           return;
         }
 
-        // 6. 📱 تحريك رأسي/عمودي للنصوص باللمس
         if (verticalMoveState) {
           const dy = (touch.clientY - verticalMoveState.startY) / zoom;
           const newTop = Math.round(verticalMoveState.startTop + dy);
@@ -568,7 +550,6 @@ export function Workspace({
           return;
         }
 
-        // 7. 📱 تمديد عرض النصوص من اليمين واليسار باللمس
         if (leftStretchState) {
           const dx = (touch.clientX - leftStretchState.startX) / zoom;
           const newW = Math.max(25, Math.round(leftStretchState.startWidth - dx));
@@ -615,9 +596,7 @@ export function Workspace({
     layers
   ]);
 
-  // Handle marquee selection or brush/eraser/clone stamp draw start
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Zoom tool handling
     if (activeTool === 'zoom') {
       e.preventDefault();
       const zoomFactor = 0.25;
@@ -629,7 +608,6 @@ export function Workspace({
       return;
     }
 
-    // Hand tool / Pan handling (Middle button e.button === 1 or left button on hand tool)
     if (activeTool === 'hand' || e.button === 1) {
       setIsPanning(true);
       setPanStart({
@@ -651,13 +629,11 @@ export function Workspace({
     const clickX = (e.clientX - rect.left) / zoom;
     const clickY = (e.clientY - rect.top) / zoom;
 
-    // High-resolution coordinates scale mapping
     const scaleX = img.naturalWidth / img.offsetWidth;
     const scaleY = img.naturalHeight / img.offsetHeight;
     const natX = clickX * scaleX;
     const natY = clickY * scaleY;
 
-    // Check if setting stamp source
     if (activeTool === 'clone_stamp' && isSettingStampSource) {
       setStampSource({ x: natX, y: natY });
       setIsSettingStampSource(false);
@@ -723,14 +699,13 @@ export function Workspace({
                 brushSize
               );
               ctx.restore();
-                }
-              }
             }
           }
+        }
+      }
       return;
     }
 
-    // Check if clicked exactly on background image or existing selection box
     const target = e.target as HTMLElement;
     if (target !== imageRef.current && target !== wrapper && !target.classList.contains('selection-box-bg')) {
       return;
@@ -752,7 +727,6 @@ export function Workspace({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // Hand tool panning / scrolling
     if (isPanning && containerRef.current) {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
@@ -846,7 +820,6 @@ export function Workspace({
         visible: true,
       });
     } else if (dragState) {
-      // Direct drag layer positioning, scaled by zoom
       const dx = (e.clientX - dragState.startX) / zoom;
       const dy = (e.clientY - dragState.startY) / zoom;
       const newLeft = dragState.startLeft + dx;
@@ -857,7 +830,6 @@ export function Workspace({
         top: `${newTop}px`,
       });
     } else if (resizeState) {
-      // Direct resize layer dimensions, scaled by zoom
       const dx = (e.clientX - resizeState.startX) / zoom;
       const dy = (e.clientY - resizeState.startY) / zoom;
       let newW = resizeState.startWidth;
@@ -887,7 +859,6 @@ export function Workspace({
       };
 
       if (layer && autoFitText) {
-        // Recalculate optimal inline font sizes
         const fontSz = calculateOptimalFontSize(
           layer.text,
           newW,
@@ -993,7 +964,6 @@ export function Workspace({
     }
   };
 
-  // Global window listeners for drag & resize and rotate gestures
   useEffect(() => {
     const isDraggingSomething = !!(
       dragState ||
@@ -1009,7 +979,6 @@ export function Workspace({
     if (!isDraggingSomething) return;
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
-      // Create a simulated React MouseEvent wrapper for compatible coordination updates
       const simulatedEvent = {
         clientX: e.clientX,
         clientY: e.clientY,
@@ -1044,7 +1013,6 @@ export function Workspace({
     zoom,
   ]);
 
-  // Draggable layer handlers (Mouse)
   const handleLayerDragStart = (layer: MangaLayer, e: React.MouseEvent) => {
     if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand'].includes(activeTool)) return;
 
@@ -1069,7 +1037,6 @@ export function Workspace({
     });
   };
 
-  // Draggable layer handlers (Touch للهواتف)
   const handleLayerTouchStart = (layer: MangaLayer, e: React.TouchEvent) => {
     if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand'].includes(activeTool)) return;
 
@@ -1095,7 +1062,6 @@ export function Workspace({
     });
   };
 
-  // Resize handle triggers
   const handleResizeStart = (layer: MangaLayer, pos: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1321,7 +1287,7 @@ export function Workspace({
               key={layer.id}
               id={`layer-${layer.id}`}
               onMouseDown={e => handleLayerDragStart(layer, e)}
-              onTouchStart={e => handleLayerTouchStart(layer, e)} // دعم السحب باللمس للهواتف
+              onTouchStart={e => handleLayerTouchStart(layer, e)}
               style={{
                 left: layer.left,
                 top: layer.top,
@@ -1354,15 +1320,15 @@ export function Workspace({
                   letterSpacing: layer.style.letterSpacing,
                   outline: 'none',
                   backgroundColor: 'transparent',
-                  direction: 'rtl', // 👈 حل مشكلة اتجاه الفاصلة وعلامات الترقيم العربية لتظهر في نهايات وبدايات الجمل بالشكل الطبيعي
-                  unicodeBidi: 'plaintext', // 👈 يمنع تداخل النصوص واللغات المختلطة (عربي/إنجليزي) بشكل منسق
+                  direction: 'rtl',
+                  unicodeBidi: 'plaintext',
                 }}
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={e => {
                   onUpdateLayer(layer.id, { text: e.target.innerText });
                 }}
-                className="w-full h-full flex items-center justify-center select-text whitespace-pre-wrap select-none overflow-hidden"
+                className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden"
               >
                 {layer.text}
               </div>
@@ -1370,8 +1336,7 @@ export function Workspace({
               {/* Special Controls and Handles (Shown when active) */}
               {isActive && (
                 <>
-                  {/* --- 1. Corner Handles (أدوات التحكم بالصندوق) --- */}
-                  {/* Top-Left: Delete layer (علامة X) */}
+                  {/* --- 1. Corner Handles --- */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1389,7 +1354,6 @@ export function Workspace({
                     ✕
                   </button>
 
-                  {/* Top-Right: Rotate layer (الأسهم الدائرية) */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1438,7 +1402,6 @@ export function Workspace({
                     🔄
                   </button>
 
-                  {/* Bottom-Left: Duplicate active layer (أيقونة الأوراق المتعددة) */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1459,7 +1422,6 @@ export function Workspace({
                     📋
                   </button>
 
-                  {/* Bottom-Right: Proportional Scale (المربع وبداخله سهم) */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1505,8 +1467,7 @@ export function Workspace({
                   </button>
 
 
-                  {/* --- 2. Side Handles (أدوات المحاذاة والتمديد) --- */}
-                  {/* Top: Vertical translation and double-click vertical flip (السهم العلوي والسفلي) */}
+                  {/* --- 2. Side Handles --- */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1545,7 +1506,6 @@ export function Workspace({
                     ↕️
                   </button>
 
-                  {/* Left: Left width stretch handle (الأسهم الجانبية المتعاكسة) */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1581,7 +1541,6 @@ export function Workspace({
                     ↔️
                   </button>
 
-                  {/* Right: Toggle alignment cycles (الخطوط الأفقية للتوجيه) */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1610,8 +1569,7 @@ export function Workspace({
                   </button>
 
 
-                  {/* --- 3. Bottom Accessories (الأدوات بالأسفل) --- */}
-                  {/* Bottom-left: open quick edit dialog/input (لوحة المفاتيح) */}
+                  {/* --- 3. Bottom Accessories --- */}
                   <button
                     type="button"
                     onMouseDown={e => {
@@ -1633,7 +1591,6 @@ export function Workspace({
                     ⌨️
                   </button>
 
-                  {/* Center-bottom: Save style preset (أيقونة + مع بطاقات لحفظ الstyle) */}
                   <button
                     type="button"
                     onMouseDown={e => {
