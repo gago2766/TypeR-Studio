@@ -12,6 +12,12 @@ jobs:
 
       - name: Unzip and move files
         run: |
+          # Check if zip file exists before attempting to unzip
+          if [ ! -f "TypeR-Studio-main.zip" ]; then
+            echo "Error: TypeR-Studio-main.zip not found in repository"
+            exit 1
+          fi
+          
           # 1. فك ضغط الملف
           unzip -o TypeR-Studio-main.zip
           
@@ -24,7 +30,7 @@ jobs:
             # 3. حذف المجلد بعد تفريغه لحفظ النظافة
             rm -rf TypeR-Studio-main
           fi
-
+          
           # 4. اختياري: حذف ملف الـ zip الأصلي حتى لا يستهلك مساحة
           rm -f TypeR-Studio-main.zip
 
