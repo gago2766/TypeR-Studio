@@ -1406,7 +1406,7 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // محاذاة وتوسيط النص ضمن منطقة التحديد اليدوية
+  // buckets text layout correctly inside visual area bounds
   const handleAlignText = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
@@ -1685,7 +1685,7 @@ export default function App() {
     addToast('تم تطبيق كامل إعدادات النمط بنجاح', 'success');
   };
 
-  // محاكاة تمثيل طبقات النصوص على كائن Canvas مستقل (مفيد لـ PSD)
+  // محاكاة تمثيل طبقات النصوص على كائن Canvas مستقل (مفيد لـ PSD) - تم تحديثه لاحترام فواصل الأسطر \n
   const renderLayerToSeparateCanvas = (
     layer: MangaLayer,
     scaleX: number,
@@ -1724,20 +1724,30 @@ export default function App() {
     ctx.textAlign = style.textAlign || 'center';
     ctx.direction = 'rtl';
 
-    const words = layer.text.split(' ');
+    // تقسيم ورسم النص مع احترام الأسطر الفرعية ومحاذاة التسطير
+    const rawLines = layer.text.split('\n');
     const lines: string[] = [];
-    let currentLine = '';
-
-    for (let n = 0; n < words.length; n++) {
-      const test = currentLine + words[n] + ' ';
-      if (ctx.measureText(test).width > width && n > 0) {
-        lines.push(currentLine.trim());
-        currentLine = words[n] + ' ';
-      } else {
-        currentLine = test;
+    
+    rawLines.forEach(rawLine => {
+      const words = rawLine.split(' ');
+      let currentLine = '';
+      for (let n = 0; n < words.length; n++) {
+        const word = words[n];
+        if (!word && n > 0) continue;
+        const test = currentLine ? currentLine + ' ' + word : word;
+        if (ctx.measureText(test).width > width && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = test;
+        }
       }
-    }
-    lines.push(currentLine.trim());
+      if (currentLine) {
+        lines.push(currentLine);
+      } else if (rawLine === '') {
+        lines.push('');
+      }
+    });
 
     const lineH = fs * (style.lineHeight || 1.25);
     const totalH = lines.length * lineH;
@@ -1759,7 +1769,7 @@ export default function App() {
     return { canvas, left: Math.round(left), top: Math.round(top) };
   };
 
-  // محاكاة تمثيل طبقات النصوص على كائن Canvas مباشر للتصدير
+  // محاكاة تمثيل طبقات النصوص على كائن Canvas مباشر للتصدير - تم تحديثه لاحترام فواصل الأسطر \n
   const renderLayerToCanvasBuffer = (
     ctx: CanvasRenderingContext2D,
     layer: MangaLayer,
@@ -1789,20 +1799,30 @@ export default function App() {
     ctx.textAlign = style.textAlign || 'center';
     ctx.direction = 'rtl';
 
-    const words = layer.text.split(' ');
+    // تقسيم ورسم النص مع احترام الأسطر الفرعية ومحاذاة التسطير
+    const rawLines = layer.text.split('\n');
     const lines: string[] = [];
-    let currentLine = '';
-
-    for (let n = 0; n < words.length; n++) {
-      const test = currentLine + words[n] + ' ';
-      if (ctx.measureText(test).width > width && n > 0) {
-        lines.push(currentLine.trim());
-        currentLine = words[n] + ' ';
-      } else {
-        currentLine = test;
+    
+    rawLines.forEach(rawLine => {
+      const words = rawLine.split(' ');
+      let currentLine = '';
+      for (let n = 0; n < words.length; n++) {
+        const word = words[n];
+        if (!word && n > 0) continue;
+        const test = currentLine ? currentLine + ' ' + word : word;
+        if (ctx.measureText(test).width > width && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = test;
+        }
       }
-    }
-    lines.push(currentLine.trim());
+      if (currentLine) {
+        lines.push(currentLine);
+      } else if (rawLine === '') {
+        lines.push('');
+      }
+    });
 
     const lineH = fs * (style.lineHeight || 1.25);
     const totalH = lines.length * lineH;
@@ -2027,7 +2047,7 @@ export default function App() {
               path: filename,
             });
 
-            // استدعاء شاشة المشاركة الأصلية للنظام لأي تطبيق آخر (واتساب، تليجرام، إلخ)
+            // استدعاء شاشة المشاركة الأصلية للنظام لأي تطبيق آخر
             await Share.share({
               title: 'TypeR Studio - مشاركة ترجمة المانجا',
               files: [fileUriResult.uri],
@@ -2884,7 +2904,7 @@ export default function App() {
                       checked={isChecked}
                       onChange={() => {
                         if (isChecked) {
-                          setCheckedStylesForExport(prev => prev.filter(x => x !== s.id));
+                          checkedStylesForExport(prev => prev.filter(x => x !== s.id));
                         } else {
                           setCheckedStylesForExport(prev => [...prev, s.id]);
                         }
@@ -3284,7 +3304,7 @@ export default function App() {
           watermarkOpacity={watermarkOpacity}
           watermarkPosition={watermarkPosition}
           watermarkSize={watermarkSize}
-          onDuplicateLayer={handleDuplicateLayer}
+          onDuplicateLayer={onDuplicateLayer}
           onSavePresetFromStyle={handleSavePresetFromStyle}
         />
 
@@ -3314,7 +3334,7 @@ export default function App() {
         />
       </div>
 
-      {/* الشريحة الجانبية للتحكم والإعدادات وتمرير دالة المشاركة */}
+      {/* الشريحة الجانبية للتحكم والإعدادات */}
       <Sidebar
         onImageUpload={handleImageUpload}
         onExportPNG={handleExportPNG}
@@ -3323,7 +3343,7 @@ export default function App() {
         onExportAllZip={handleExportAllZip}
         onSaveState={handleSaveState}
         onLoadState={handleRestoreState}
-        onShare={handleShare} // 👈 نمرر هنا دالة المشاركة الجديدة
+        onShare={handleShare}
         activeTool={activeTool}
         setActiveTool={setActiveTool}
         wandTolerance={wandTolerance}
