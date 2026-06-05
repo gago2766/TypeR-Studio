@@ -456,7 +456,7 @@ export function Sidebar({
               className={`text-[10px] py-1 px-1.5 rounded transition flex items-center justify-center gap-1 select-none border border-[#3c3c3c] cursor-pointer ${
                 canDrawingRedo
                   ? 'bg-[#1e1e1e] text-white hover:bg-[#3d3d3d] hover:border-[#555]'
-                  : 'bg-black/20 text-gray-600 border-[#222] cursor-not-allowed'
+                  : 'bg-black/20 text-gray-500 border-[#222] cursor-not-allowed'
               }`}
               title="إعادة تطبيق ضربة الفرشاة المرجوع عنها"
             >
@@ -855,6 +855,28 @@ export function Sidebar({
             </div>
           </div>
 
+          {/* 👈 هنا نضع ميزة اختيار الخطوط المفضلة المضافة حديثاً */}
+          {favFonts && favFonts.length > 0 && (
+            <div className="flex items-center justify-between text-[11px] gap-2 border-t border-[#2d2d2d]/40 pt-2 mt-0.5">
+              <label className="text-[#f5c518] truncate font-semibold">⭐ خطوطك المفضلة</label>
+              <select
+                value={favFonts.includes(fontFamily) ? fontFamily : ""}
+                onChange={e => {
+                  if (e.target.value) setFontFamily(e.target.value);
+                }}
+                className="w-[170px] bg-[#1a2d1d] border border-green-800 text-[#7be09c] text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-green-600 font-bold cursor-pointer"
+                id="prop-fav-fonts-select"
+              >
+                <option value="" disabled className="text-gray-500">اختر من المفضلة...</option>
+                {allFonts.filter(f => favFonts.includes(f.value)).map(f => (
+                  <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Quick bold/italic toolbar */}
           <div className="flex gap-1 mt-1 justify-center">
             <button
@@ -1052,3 +1074,4 @@ export function Sidebar({
     </div>
   );
 }
+
