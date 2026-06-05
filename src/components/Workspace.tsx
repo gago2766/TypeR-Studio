@@ -5,7 +5,7 @@ import { calculateOptimalFontSize } from '../utils';
 interface WorkspaceProps {
   mangaSrc: string;
   activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand';
-  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void; // 👈 إضافة دالة تغيير الأداة
+  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void; // 👈 إضافة دالة تغيير الأداة النشطة
   wandDimensions: { imgW: number; imgH: number; dispW: number; dispH: number; x: number; y: number; w: number; h: number } | null; // 👈 إضافة أبعاد العصا
   layers: MangaLayer[];
   activeLayer: MangaLayer | null;
@@ -1092,6 +1092,29 @@ export function Workspace({
     }
   };
 
+  // 🎯 حساب الإحداثيات المناسبة لعرض شريط الأدوات العائم فوق الفقاعة النشطة مع حماية من حواف الشاشة
+  const getQuickToolsPosition = () => {
+    if (wandDimensions) {
+      const left = wandDimensions.x + (wandDimensions.w / 2);
+      let top = wandDimensions.y - 45; // الارتفاع المفضل فوق الفقاعة مباشرة
+      if (top < 10) {
+        top = wandDimensions.y + wandDimensions.h + 15; // عرض الشريط أسفل الفقاعة إذا كانت قريبة جداً من الحافة العلوية
+      }
+      return { left, top, visible: true };
+    }
+    if (selectionBox && selectionBox.visible && selectionBox.width > 20) {
+      const left = selectionBox.left + (selectionBox.width / 2);
+      let top = selectionBox.top - 45;
+      if (top < 10) {
+        top = selectionBox.top + selectionBox.height + 15;
+      }
+      return { left, top, visible: true };
+    }
+    return { left: 0, top: 0, visible: false };
+  };
+
+  const quickTools = getQuickToolsPosition();
+
   return (
     <div
       ref={containerRef}
@@ -1191,6 +1214,86 @@ export function Workspace({
           className="block max-w-full h-auto"
           referrerPolicy="no-referrer"
         />
+
+        {/* 🛠️ شريط الأدوات العائم والمخصص لتسريع الاختيار فوق الفقاعة مباشرة */}
+        {quickTools.visible && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${quickTools.left}px`,
+              top: `${quickTools.top}px`,
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              gap: '4px',
+              backgroundColor: '#161616f2',
+              backdropFilter: 'blur(8px)',
+              padding: '4px 8px',
+              borderRadius: '9999px',
+              border: '1px solid #3c3c3c',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              zIndex: 350,
+              direction: 'rtl',
+            }}
+            className="flex items-center select-none"
+            onMouseDown={e => e.stopPropagation()} // منع تمرير الضغط للخلفية
+            onTouchStart={e => e.stopPropagation()} // منع تمرير اللمس على الهواتف
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTool('hand')}
+              style={{
+                backgroundColor: activeTool === 'hand' ? '#007acc' : 'transparent',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '9999px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+              }}
+              className="flex items-center gap-1 hover:bg-[#2c2c2c] transition-colors"
+            >
+              ✋ اليد
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTool('brush')}
+              style={{
+                backgroundColor: activeTool === 'brush' ? '#007acc' : 'transparent',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '9999px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+              }}
+              className="flex items-center gap-1 hover:bg-[#2c2c2c] transition-colors"
+            >
+              🖌️ الفرشاة
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTool('magic_wand')}
+              style={{
+                backgroundColor: activeTool === 'magic_wand' ? '#007acc' : 'transparent',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '9999px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+              }}
+              className="flex items-center gap-1 hover:bg-[#2c2c2c] transition-colors"
+            >
+              🪄 العصا
+            </button>
+          </div>
+        )}
 
         {/* Cleaning & redrawing Canvas Layer */}
         <canvas
