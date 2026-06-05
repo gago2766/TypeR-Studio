@@ -129,6 +129,11 @@ export default function App() {
   const [compactMode, setCompactMode] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
+  // 🔑 مفتاح Gemini API المحفوظ محلياً وبشكل آمن تماماً على الهاتف
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem('typer_gemini_api_key') || '';
+  });
+
   useEffect(() => {
     // تشغيل المظهر المتجاوب الافتراضي بناءً على أبعاد الشاشة
     setIsSidebarOpen(window.innerWidth >= 1024);
@@ -2769,25 +2774,20 @@ export default function App() {
       return;
     }
 
+    // جلب مفتاح الـ API من متغير الحالة المحلي أو إعدادات البيئة
+    const activeKey = geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+    if (!activeKey) {
+      addToast('⚠️ يرجى إدخال مفتاح Gemini API Key في نافذة الإعدادات أولاً لتشغيل ممحاة الذكاء الاصطناعي', 'error');
+      setShowSettingsModal(true); // فتح نافذة الإعدادات تلقائياً للمستخدم لتسهيل الإدخال المباشر
+      return;
+    }
+
     addToast('✨ جاري إرسال الطلب ومعالجة الصفحة بالذكاء الاصطناعي عبر Gemini... 🧠🎨', 'success');
 
     try {
       // استيراد حزمة الـ SDK لـ Google GenAI ديناميكياً لتجنب المشاكل البرمجية أثناء الإقلاع
       const { GoogleGenAI } = await import('@google/genai');
-
-      // جلب مفتاح الـ API من متغيرات بيئة الـ Vite أو الطلب يدوياً من المستخدم
-      const key = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (window as any).GEMINI_API_KEY;
-      if (!key) {
-        const manualKey = prompt('لم يتم العثور على مفتاح Gemini API Key في إعدادات البيئة.\nيرجى إدخال مفتاح الـ API الخاص بك يدوياً لتشغيل الذكاء الاصطناعي:');
-        if (!manualKey) {
-          addToast('❌ تم إلغاء العملية لعدم توفر مفتاح الـ API', 'error');
-          return;
-        }
-        (window as any).GEMINI_API_KEY = manualKey;
-      }
-
-      const apiKeyToUse = key || (window as any).GEMINI_API_KEY;
-      const ai = new GoogleGenAI({ apiKey: apiKeyToUse });
+      const ai = new GoogleGenAI({ apiKey: activeKey });
 
       // استدعاء نموذج Gemini 2.5 Flash المعتمد لمعالجة وتعديل الصور
       const response = await ai.models.generateContent({
@@ -3186,6 +3186,40 @@ export default function App() {
                   </label>
                 </div>
               </div>
+
+              {/* 🔑 قسم إعداد مفتاح الـ API للذكاء الاصطناعي مدمج محلياً */}
+              <h3 className="text-sm font-bold text-white border-b border-[#2d2d2d]/30 pt-3 pb-1.5 flex items-center gap-1.5 justify-end">
+                <span>🔑 مفتاح تشغيل الذكاء الاصطناعي (Gemini API Key)</span>
+              </h3>
+              <div className="flex flex-col gap-2 text-xs text-gray-300">
+                <p className="text-[10px] text-gray-400 leading-normal">
+                  مطلوب لتشغيل ميزة ممحاة الخلفية الذكية (Inpaint). يتم حفظ المفتاح محلياً بشكل آمن تماماً على هاتفك للعمل دوماً.
+                </p>
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="password"
+                    value={geminiApiKey}
+                    onChange={e => {
+                      setGeminiApiKey(e.target.value);
+                      localStorage.setItem('typer_gemini_api_key', e.target.value);
+                    }}
+                    placeholder="أدخل مفتاح AlzaSy..."
+                    className="w-full bg-[#151515] border border-[#2d2d2d] text-white rounded px-2.5 py-1.5 text-left text-xs font-mono focus:border-[#007acc] focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-gray-500">
+                  <a 
+                    href="https://aistudio.google.com/" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-[#007acc] hover:underline"
+                  >
+                    الحصول على مفتاح API مجاني من Google AI Studio 🌐
+                  </a>
+                  <span>حالة المفتاح: {geminiApiKey ? '✅ مفعّل محلياً' : '❌ غير مفعّل'}</span>
+                </div>
+              </div>
+
             </div>
 
             <h3 className="text-sm font-bold text-white border-b border-[#2d2d2d] pt-2 pb-2 flex items-center gap-1.5 justify-end">
@@ -3569,6 +3603,7 @@ export default function App() {
         canDrawingRedo={!!(history[currentPageIndex]?.redo && history[currentPageIndex].redo.length > 0)}
         onWhitenWandSelection={handleWhitenWandSelection}
         hasWandMask={wandMask !== null}
+        onAIInpaint={handleAIInpaint} // 👈 ربط الدالة بالـ Sidebar الجديد بشكل مباشر وسليم
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -3584,3 +3619,4 @@ export default function App() {
     </div>
   );
 }
+
