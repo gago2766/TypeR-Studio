@@ -3268,6 +3268,8 @@ export default function App() {
         <Workspace
           mangaSrc={mangaSrc}
           activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
           onSetActiveLayer={setActiveLayer}
@@ -3427,9 +3429,11 @@ export default function App() {
         onUpdateLayer={handleUpdateLayer}
         onDeleteLayer={handleDeleteLayer}
         allFonts={allFontsList}
+        favFonts={favFonts}
         onOpenFontManager={() => setShowFontManager(true)}
       />
     </div>
     </div>
   );
 }
+
