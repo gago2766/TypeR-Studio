@@ -7,6 +7,7 @@ interface FloatingToolbarProps {
   onUpdateLayer: (layerId: string, updates: Partial<MangaLayer>) => void;
   onDeleteLayer: (layerId: string) => void;
   allFonts: CustomFont[];
+  favFonts: string[]; // 👈 إضافة خاصية الخطوط المفضلة المستقبلة من App.tsx
   onOpenFontManager: () => void;
 }
 
@@ -15,6 +16,7 @@ export function FloatingToolbar({
   onUpdateLayer,
   onDeleteLayer,
   allFonts,
+  favFonts, // 👈 فك حزمة الخاصية الجديدة هنا
   onOpenFontManager,
 }: FloatingToolbarProps) {
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -84,6 +86,11 @@ export function FloatingToolbar({
     });
   };
 
+  // 🎯 فلترة الخطوط لإظهار المفضلة فقط مع إبقاء خط الفقاعة النشط حالياً لتجنب الاختيار التلقائي العشوائي
+  const filteredFonts = favFonts && favFonts.length > 0
+    ? allFonts.filter(f => favFonts.includes(f.value) || f.value === style.fontFamily)
+    : allFonts;
+
   return (
     <div
       style={{
@@ -111,7 +118,7 @@ export function FloatingToolbar({
         onChange={e => handleStyleChange({ fontFamily: e.target.value })}
         className="bg-[#2a2a2a] border border-[#444] text-white rounded px-1.5 py-0.5 text-xs max-w-[100px] focus:outline-none focus:border-[#007acc]"
       >
-        {allFonts.map(f => (
+        {filteredFonts.map(f => (
           <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
             {f.name}
           </option>
@@ -213,3 +220,4 @@ export function FloatingToolbar({
     </div>
   );
 }
+
