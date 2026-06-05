@@ -100,6 +100,7 @@ interface SidebarProps {
   // Whiten wand selection props
   onWhitenWandSelection?: () => void;
   hasWandMask?: boolean;
+  onAIInpaint?: () => void; // 👈 إضافة الخاصية لاستدعاء الممحاة الذكية بالذكاء الاصطناعي
 
   // Bottom action triggers
   onPrevLine: () => void;
@@ -192,6 +193,7 @@ export function Sidebar({
   canDrawingRedo = false,
   onWhitenWandSelection,
   hasWandMask = false,
+  onAIInpaint, // 👈 فك حزمة الخاصية الجديدة المضافة
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -464,8 +466,8 @@ export function Sidebar({
             </button>
           </div>
 
-          {/* Whiten Wand Selection Button */}
-          <div className="mb-2">
+          {/* Whiten Wand Selection Button & AI Inpainter */}
+          <div className="mb-2 flex flex-col gap-1.5">
             <button
               type="button"
               onClick={onWhitenWandSelection}
@@ -483,6 +485,17 @@ export function Sidebar({
               }
             >
               <span>✨ تبييض تحديد العصا بضغطة واحدة</span>
+            </button>
+
+            {/* 🧠 ممحاة الخلفية الذكية بالذكاء الاصطناعي (AI Inpainting) */}
+            <button
+              type="button"
+              onClick={onAIInpaint}
+              className="w-full text-[11px] py-2 px-3 rounded font-bold transition flex items-center justify-center gap-1.5 select-none border cursor-pointer bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white border-purple-600 shadow-md active:scale-[0.98]"
+              id="ai-inpaint-btn"
+              title="تبييض ومسح الكلمات وإعادة رسم الخلفية تلقائياً بذكاء اصطناعي مدمج عبر Gemini"
+            >
+              <span>🧠 ممحاة الخلفية الذكية (Inpaint)</span>
             </button>
           </div>
 
