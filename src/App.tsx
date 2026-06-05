@@ -1,3 +1,30 @@
+هذا هو الملف الثاني src/App.tsx بعد التعديل والتحديث لتشغيل ميزة الممحاة الذكية
+بالذكاء الاصطناعي محلياً عبر الواجهة الأمامية للـ APK.
+
+التعديلات التي تم إجراؤها في هذا الملف:
+
+1.  دوال استخراج البيانات لتغذية الذكاء الاصطناعي:
+      - إضافة دالة generateMaskBase64 التي تقوم تلقائياً بتحليل لوحة الرسم
+        التبييضي للمستخدم وإنشاء قناع ثنائي عالي التباين (أبيض وأسود) يحدد
+        بدقة المنطقة التي تم الرسم عليها بفرشاة التبييض ليعلم الذكاء الاصطناعي
+        الموضع المراد تنظيفه [3.1.1].
+      - إضافة دالة getOriginalImageBase64 لاستخلاص كود الصورة الأصلية لتمريرها
+        كمرجع تفصيلي لـ Gemini.
+2.  برمجة دالة الاستدعاء الذكية (handleAIInpaint):
+      - استيراد مكتبة @google/genai بشكل ديناميكي آمن لمنع تعليق التطبيق أو
+        توقفه.
+      - قراءة مفتاح الـ API من إعدادات الـ Vite الافتراضية، مع توفير خيار تلقائي
+        للمستخدم لإدخال المفتاح يدوياً في حال لم يكن معداً مسبقاً في ملف
+        .env.local [1].
+      - تمرير الطلب لنموذج Gemini 2.5 Flash لترميم الخلفية بشكل متناسق ومطابق
+        لنسيج الورق والرسم، ثم تلقي الصورة المصلحة كـ Image Part وتحديث
+        الواجهة مباشرة بها دون الحاجة لأي سيرفر خارجي [3.3.3, 3.4.4].
+3.  مزامنة الطبقات:
+      - تمرير دالة handleAIInpaint إلى مكون الـ Sidebar عبر خاصية onAIInpaint
+        لربط زر التحكم الجانبي.
+
+الكود الكامل المحدث لـ src/App.tsx:
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -2685,6 +2712,153 @@ export default function App() {
     ? activeLayer.text 
     : 'حدد سطر كتابة نصي بالمسرح لتفعيل الكشيدة';
 
+  // 🧠 دالة توليد قناع أبيض وأسود عالي الدقة (Mask) من لوحة الرسم الحالية لإرساله للـ AI
+  const generateMaskBase64 = () => {
+    const cleaningCanvas = cleaningCanvasRef.current;
+    if (!cleaningCanvas) return null;
+
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = cleaningCanvas.width;
+    maskCanvas.height = cleaningCanvas.height;
+    const mctx = maskCanvas.getContext('2d');
+    if (!mctx) return null;
+
+    // ملء الخلفية باللون الأسود بالكامل (الأماكن المحفوظة)
+    mctx.fillStyle = '#000000';
+    mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+    const tempCtx = cleaningCanvas.getContext('2d');
+    if (!tempCtx) return null;
+
+    try {
+      const imgData = tempCtx.getImageData(0, 0, cleaningCanvas.width, cleaningCanvas.height);
+      const data = imgData.data;
+
+      const maskData = mctx.createImageData(cleaningCanvas.width, cleaningCanvas.height);
+      const mData = maskData.data;
+
+      let hasDrawnPixels = false;
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3];
+        if (alpha > 10) {
+          // بكسل ملوّن ممسوح: نجعله أبيض في القناع (المنطقة المراد تبييضها وإعادة رسمها)
+          mData[i] = 255;
+          mData[i + 1] = 255;
+          mData[i + 2] = 255;
+          mData[i + 3] = 255;
+          hasDrawnPixels = true;
+        } else {
+          // بكسل شفاف: يبقى أسود
+          mData[i] = 0;
+          mData[i + 1] = 0;
+          mData[i + 2] = 0;
+          mData[i + 3] = 255;
+        }
+      }
+
+      // إذا لم يقم المستخدم بالرسم بالفرشاة أو الممحاة بعد، لا نرسل طلباً فارغاً
+      if (!hasDrawnPixels) return null;
+
+      mctx.putImageData(maskData, 0, 0);
+      return maskCanvas.toDataURL('image/png').split(',')[1];
+    } catch (e) {
+      console.error('Error generating mask:', e);
+      return null;
+    }
+  };
+
+  // 🧠 دالة استخلاص الصورة الأصلية للصفحة الحالية كـ Base64
+  const getOriginalImageBase64 = () => {
+    const src = pages[currentPageIndex]?.src;
+    if (!src) return null;
+    if (src.startsWith('data:')) {
+      return src.split(',')[1];
+    }
+    return null;
+  };
+
+  // 🧠 دالة تنظيف الكلمات وإعادة رسم الخلفيات بذكاء اصطناعي محلي فائق عبر Gemini
+  const handleAIInpaint = async () => {
+    if (currentPageIndex === -1 || pages.length === 0) {
+      addToast('⚠️ لا توجد صفحة مانجا نشطة لمعالجتها', 'error');
+      return;
+    }
+
+    const maskBase64 = generateMaskBase64();
+    if (!maskBase64) {
+      addToast('⚠️ الرجاء الرسم بالفرشاة أو الممحاة على الكلمات أولاً لتحديد المساحة المراد إزالتها وإعادة رسمها', 'error');
+      return;
+    }
+
+    const originalBase64 = getOriginalImageBase64();
+    if (!originalBase64) {
+      addToast('⚠️ عذراً، تعذر العثور على الصورة الأصلية بشكل سليم', 'error');
+      return;
+    }
+
+    addToast('✨ جاري إرسال الطلب ومعالجة الصفحة بالذكاء الاصطناعي عبر Gemini... 🧠🎨', 'success');
+
+    try {
+      // استيراد حزمة الـ SDK لـ Google GenAI ديناميكياً لتجنب المشاكل البرمجية أثناء الإقلاع
+      const { GoogleGenAI } = await import('@google/genai');
+
+      // جلب مفتاح الـ API من متغيرات بيئة الـ Vite أو الطلب يدوياً من المستخدم
+      const key = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (window as any).GEMINI_API_KEY;
+      if (!key) {
+        const manualKey = prompt('لم يتم العثور على مفتاح Gemini API Key في إعدادات البيئة.\nيرجى إدخال مفتاح الـ API الخاص بك يدوياً لتشغيل الذكاء الاصطناعي:');
+        if (!manualKey) {
+          addToast('❌ تم إلغاء العملية لعدم توفر مفتاح الـ API', 'error');
+          return;
+        }
+        (window as any).GEMINI_API_KEY = manualKey;
+      }
+
+      const apiKeyToUse = key || (window as any).GEMINI_API_KEY;
+      const ai = new GoogleGenAI({ apiKey: apiKeyToUse });
+
+      // استدعاء نموذج Gemini 2.5 Flash المعتمد لمعالجة وتعديل الصور
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: originalBase64
+            }
+          },
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: maskBase64
+            }
+          },
+          "This is a manga page and a black-and-white mask indicating the areas with text or artifacts to be removed. Please erase the text in the white areas of the mask, and seamlessly reconstruct the background texture, drawings, or speech bubbles underneath. Return only the final edited page as an image output."
+        ],
+        config: {
+          responseModalities: ["IMAGE"]
+        }
+      });
+
+      const candidate = response.candidates?.[0];
+      const part = candidate?.content?.parts?.find(p => p.inlineData);
+
+      if (part && part.inlineData && part.inlineData.data) {
+        const resultBase64 = part.inlineData.data;
+        const resultDataUrl = `data:image/png;base64,${resultBase64}`;
+
+        // تحديث حالة الرسم وصورة التبييض للصفحة الحالية بالصورة النظيفة المولدة ذكياً
+        handleUpdateCleaningDataUrl(resultDataUrl);
+        addToast('✓ تم تنظيف وإعادة رسم الخلفية بالذكاء الاصطناعي بنجاح! 🎉🎨', 'success');
+      } else {
+        console.warn('Gemini response did not contain an image part:', response);
+        addToast('❌ فشل توليد الصورة. تأكد من أن التحديد دقيق ومفتاح الـ API فعال', 'error');
+      }
+    } catch (err: any) {
+      console.error('AI Inpainting Error:', err);
+      addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${err.message || err}`, 'error');
+    }
+  };
+
   return (
     <div className="w-screen h-screen overflow-x-auto overflow-y-hidden bg-[#121212] antialiased">
       <div className="flex h-full min-w-[1240px] font-sans text-gray-300 relative overflow-hidden">
@@ -3437,4 +3611,3 @@ export default function App() {
     </div>
   );
 }
-
