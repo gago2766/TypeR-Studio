@@ -5,6 +5,8 @@ import { calculateOptimalFontSize } from '../utils';
 interface WorkspaceProps {
   mangaSrc: string;
   activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand';
+  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void; // 👈 إضافة دالة تغيير الأداة
+  wandDimensions: { imgW: number; imgH: number; dispW: number; dispH: number; x: number; y: number; w: number; h: number } | null; // 👈 إضافة أبعاد العصا
   layers: MangaLayer[];
   activeLayer: MangaLayer | null;
   onSetActiveLayer: (layer: MangaLayer | null) => void;
@@ -43,6 +45,8 @@ interface WorkspaceProps {
 export function Workspace({
   mangaSrc,
   activeTool,
+  setActiveTool, // 👈 فك حزمة الخاصية الجديدة هنا
+  wandDimensions, // 👈 فك حزمة الخاصية الجديدة هنا
   layers,
   activeLayer,
   onSetActiveLayer,
@@ -1621,3 +1625,4 @@ export function Workspace({
   </div>
 );
 }
+
