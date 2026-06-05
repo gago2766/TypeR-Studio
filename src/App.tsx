@@ -1215,7 +1215,8 @@ export default function App() {
         mask: mask,
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
-      clearWandSelection();
+      // تم تعطيل المسح الفوري ليبقى شريط الأدوات والتحديد نشطاً فوق آخر فقاعة مضافة لتسهيل الحركة
+      // clearWandSelection();
     } else {
       addToast('✓ تم تحديد الفقاعة نجاحاً بالعصا');
     }
