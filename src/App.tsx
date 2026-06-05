@@ -1234,14 +1234,14 @@ export default function App() {
       ctx.stroke();
 
       ctx.strokeStyle = '#000000';
-      ctx.lineDashOffset = -(matchOffsetRef.current + 4);
-      ctx.beginPath();
-      edgeSegments.forEach(s => {
-        ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
-        ctx.lineTo(s.x2 * dsx, dsy * dsy);
-      });
-      ctx.stroke();
-      ctx.restore();
+          ctx.lineDashOffset = -(matchOffsetRef.current + 4);
+          ctx.beginPath();
+          edgeSegments.forEach(s => {
+            ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
+            ctx.lineTo(s.x2 * dsx, s.y2 * dsy); // 👈 تم تصحيح الارتفاع بنجاح هنا
+          });
+          ctx.stroke();
+          ctx.restore();
 
       matchOffsetRef.current = (matchOffsetRef.current + 0.45) % 8;
       rAFRef.current = requestAnimationFrame(tick);
