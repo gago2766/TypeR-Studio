@@ -2765,7 +2765,7 @@ export default function App() {
 
       // استدعاء نموذج Gemini 2.5 Flash المعتمد لمعالجة وتعديل الصور
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-image', // 👈 تم التغيير للنموذج البصري المخصص للصور
         contents: [
           {
             inlineData: {
