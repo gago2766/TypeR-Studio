@@ -1153,50 +1153,6 @@ export default function App() {
     }
     setDetectedBubbleType(bType);
 
-    if (autoApplyBubbleStyle) {
-      if (bType === 'narrative_box') {
-        setFontFamily('Tahoma, sans-serif');
-        setBold(true);
-        setItalic(false);
-        setTextAlign('center');
-        setLineHeight(1.3);
-        setTracking(0);
-        addToast('🤖 تم التعرف على نوع الإطار: صندوق سرد مستطيل 📜');
-      } else if (bType === 'spiky_shout') {
-        setFontFamily('Impact, sans-serif');
-        setBold(true);
-        setItalic(false);
-        setTextAlign('center');
-        setLineHeight(1.15);
-        setTracking(1);
-        addToast('🤖 تم التعرف على نوع الإطار: فقاعة صراخ / حماسية 💥', 'success');
-      } else if (bType === 'thought_cloud') {
-        setFontFamily("'Times New Roman', serif");
-        setBold(false);
-        setItalic(true);
-        setTextAlign('center');
-        setLineHeight(1.4);
-        setTracking(0);
-        addToast('🤖 تم التعرف على نوع الإطار: فقاعة تفكير سحابية 💭');
-      } else if (bType === 'circular') {
-        setFontFamily('Tahoma, sans-serif');
-        setBold(false);
-        setItalic(false);
-        setTextAlign('center');
-        setLineHeight(1.3);
-        setTracking(0);
-        addToast('🤖 تم التعرف على نوع الإطار: فقاعة دائرية نقية 🔵', 'success');
-      } else {
-        setFontFamily('Tahoma, sans-serif');
-        setBold(false);
-        setItalic(false);
-        setTextAlign('center');
-        setLineHeight(1.35);
-        setTracking(0);
-        addToast('🤖 تم التعرف على نوع الإطار: فقاعة بيضاوية دائرية 💬');
-      }
-    }
-
     setWandDimensions({
       imgW,
       imgH,
@@ -1306,7 +1262,7 @@ export default function App() {
 
     const img = document.getElementById('manga-img') as HTMLImageElement;
     if (!img || img.naturalWidth === 0) {
-      addToast('❌ لا توجد صفحة مانجا محملة حالياً', 'error');
+      addToast('❌ لا توجد صفحة مانجا نشطة حالياً', 'error');
       return;
     }
 
@@ -2276,7 +2232,7 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        ctx.drawImage(exportImg, 0, 0);
+        ctx.drawImage(imgEl, 0, 0);
 
         const imgEl = document.getElementById('manga-img') as HTMLImageElement;
         const dispW = imgEl?.offsetWidth || 600;
@@ -2690,59 +2646,77 @@ export default function App() {
     ? activeLayer.text 
     : 'حدد سطر كتابة نصي بالمسرح لتفعيل الكشيدة';
 
-  // 🧠 دالة توليد قناع أبيض وأسود عالي الدقة (Mask) من لوحة الرسم الحالية لإرساله للـ AI
+  // 🧠 دالة توليد قناع أبيض وأسود عالي الدقة (Mask) من لوحة الرسم الحالية أو تحديد العصا السحرية لإرساله للـ AI
   const generateMaskBase64 = () => {
-    const cleaningCanvas = cleaningCanvasRef.current;
-    if (!cleaningCanvas) return null;
+    const imgEl = document.getElementById('manga-img') as HTMLImageElement;
+    if (!imgEl || !imgEl.naturalWidth) return null;
 
+    const imgW = imgEl.naturalWidth;
+    const imgH = imgEl.naturalHeight;
+
+    // إنشاء كانفاس أسود مؤقت لتوليد القناع
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = cleaningCanvas.width;
-    maskCanvas.height = cleaningCanvas.height;
+    maskCanvas.width = imgW;
+    maskCanvas.height = imgH;
     const mctx = maskCanvas.getContext('2d');
     if (!mctx) return null;
 
     // ملء الخلفية باللون الأسود بالكامل (الأماكن المحفوظة)
     mctx.fillStyle = '#000000';
-    mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+    mctx.fillRect(0, 0, imgW, imgH);
 
-    const tempCtx = cleaningCanvas.getContext('2d');
-    if (!tempCtx) return null;
+    const maskData = mctx.getImageData(0, 0, imgW, imgH);
+    const mData = maskData.data;
+    let hasDrawnOrSelectedPixels = false;
 
-    try {
-      const imgData = tempCtx.getImageData(0, 0, cleaningCanvas.width, cleaningCanvas.height);
-      const data = imgData.data;
-
-      const maskData = mctx.createImageData(cleaningCanvas.width, cleaningCanvas.height);
-      const mData = maskData.data;
-
-      let hasDrawnPixels = false;
-      for (let i = 0; i < data.length; i += 4) {
-        const alpha = data[i + 3];
-        if (alpha > 10) {
-          // بكسل ملوّن ممسوح: نجعله أبيض في القناع (المنطقة المراد تبييضها وإعادة رسمها)
-          mData[i] = 255;
-          mData[i + 1] = 255;
-          mData[i + 2] = 255;
-          mData[i + 3] = 255;
-          hasDrawnPixels = true;
-        } else {
-          // بكسل شفاف: يبقى أسود
-          mData[i] = 0;
-          mData[i + 1] = 0;
-          mData[i + 2] = 0;
-          mData[i + 3] = 255;
+    // 1. رسم وتجميع تحديد العصا السحرية الحالي داخل القناع باللون الأبيض في حال كان مفعلاً
+    if (wandMask && wandMask.length === imgW * imgH) {
+      for (let i = 0; i < wandMask.length; i++) {
+        if (wandMask[i] === 1) {
+          const pixelIdx = i * 4;
+          mData[pixelIdx] = 255;     // أحمر
+          mData[pixelIdx + 1] = 255; // أخضر
+          mData[pixelIdx + 2] = 255; // أزرق
+          mData[pixelIdx + 3] = 255; // ألفا (كامل الوضوح)
+          hasDrawnOrSelectedPixels = true;
         }
       }
-
-      // إذا لم يقم المستخدم بالرسم بالفرشاة أو الممحاة بعد، لا نرسل طلباً فارغاً
-      if (!hasDrawnPixels) return null;
-
-      mctx.putImageData(maskData, 0, 0);
-      return maskCanvas.toDataURL('image/png').split(',')[1];
-    } catch (e) {
-      console.error('Error generating mask:', e);
-      return null;
     }
+
+    // 2. دمج ورسم ضربات فرشاة التبييض والتنظيف اليدوية الحالية على نفس القناع
+    const cleaningCanvas = cleaningCanvasRef.current;
+    if (cleaningCanvas) {
+      const tempCtx = cleaningCanvas.getContext('2d');
+      if (tempCtx) {
+        try {
+          const imgData = tempCtx.getImageData(0, 0, cleaningCanvas.width, cleaningCanvas.height);
+          const data = imgData.data;
+
+          // التأكد من تطابق حجم لوحة التبييض مع الحجم الأصلي
+          if (cleaningCanvas.width === imgW && cleaningCanvas.height === imgH) {
+            for (let i = 0; i < data.length; i += 4) {
+              const alpha = data[i + 3];
+              if (alpha > 10) {
+                const pixelIdx = i;
+                mData[pixelIdx] = 255;
+                mData[pixelIdx + 1] = 255;
+                mData[pixelIdx + 2] = 255;
+                mData[pixelIdx + 3] = 255;
+                hasDrawnOrSelectedPixels = true;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error overlaying cleaning canvas on mask:', err);
+        }
+      }
+    }
+
+    // إذا لم يقم المستخدم بأي اختيار بالعصا أو رسم بالفرشاة، لا نرسل طلباً فارغاً
+    if (!hasDrawnOrSelectedPixels) return null;
+
+    mctx.putImageData(maskData, 0, 0);
+    return maskCanvas.toDataURL('image/png').split(',')[1];
   };
 
   // 🧠 دالة استخلاص الصورة الأصلية للصفحة الحالية كـ Base64
@@ -2764,7 +2738,7 @@ export default function App() {
 
     const maskBase64 = generateMaskBase64();
     if (!maskBase64) {
-      addToast('⚠️ الرجاء الرسم بالفرشاة أو الممحاة على الكلمات أولاً لتحديد المساحة المراد إزالتها وإعادة رسمها', 'error');
+      addToast('⚠️ الرجاء الرسم بالفرشاة على الكلمات أو التحديد بالعصا السحرية أولاً لتحديد المساحة المراد إزالتها', 'error');
       return;
     }
 
@@ -2821,6 +2795,10 @@ export default function App() {
 
         // تحديث حالة الرسم وصورة التبييض للصفحة الحالية بالصورة النظيفة المولدة ذكياً
         handleUpdateCleaningDataUrl(resultDataUrl);
+        
+        // مسح قناع وتحديد العصا السحرية المنقط تلقائياً لراحة نظر المستخدم بعد نجاح المعالجة
+        clearWandSelection();
+
         addToast('✓ تم تنظيف وإعادة رسم الخلفية بالذكاء الاصطناعي بنجاح! 🎉🎨', 'success');
       } else {
         console.warn('Gemini response did not contain an image part:', response);
@@ -3619,4 +3597,3 @@ export default function App() {
     </div>
   );
 }
-
