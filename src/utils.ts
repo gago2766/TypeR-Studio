@@ -139,124 +139,141 @@ export function wrapTextToShape(
 ): { lines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
-  // نقوم بتقسيم النص بناءً على السطور الجديدة للحفاظ على المسافات والأسطر الفارغة التي يتركها المستخدم
+  // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على توزيع المترجم
   const inputLines = text.split('\n');
   
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.direction = 'rtl'; // حل مشكلة اتجاه الفواصل أثناء حساب المساحات لفقاعات الترجمة للصور المصدّرة
+    ctx.direction = 'rtl'; // حل مشكلة فواصل الأسطر العربية
   }
 
   const measureWidth = (str: string) => {
-    if (!ctx) return str.length * fontSize * 0.6;
-    return ctx.measureText(str).width + str.length * tracking;
+    if (!ctx) return str.length * fontSize * 0.55;
+    return ctx.measureText(str).width + (str.length > 0 ? (str.length - 1) * tracking : 0);
   };
 
-  // حساب دقيق للحد المسموح به لكل سطر بناءً على موقعه الرأسي ومظهر الفقاعة وهامش الأمان
+  // دالة الحساب الهندسي الدقيق لعرض السطر الأقصى بناءً على موقعه الرأسي ليكون متناظراً ومطابقاً للصور
   const getWidthLimit = (lineIndex: number, totalLines: number) => {
     const padFactor = 1 - (marginPercent / 100);
 
-    // الصندوق المستطيل مساحته ثابتة دائماً لجميع الأسطر
+    // الصناديق المستطيلة مساحتها ثابتة دائماً لجميع الأسطر دون أي تناقص
     if (bubbleType === 'narrative_box') {
       return maxW * padFactor;
     }
     
     if (totalLines <= 1) {
-      let singleLineFactor = 0.82;
-      if (bubbleType === 'spiky_shout') singleLineFactor = 0.70;
-      if (bubbleType === 'thought_cloud') singleLineFactor = 0.76;
+      let singleLineFactor = 0.85;
+      if (bubbleType === 'spiky_shout') singleLineFactor = 0.72;
+      if (bubbleType === 'thought_cloud') singleLineFactor = 0.78;
       return maxW * singleLineFactor * padFactor;
     }
     
-    // حساب الارتفاع الرأسي الإجمالي وتحديد موضع السطر الحالي بالنسبة للمنتصف
     const totalLinesHeight = totalLines * lineH;
     const centerYOffset = -(totalLinesHeight / 2) + (lineIndex * lineH) + (lineH / 2);
-    
-    // تطبيع الموضع الرأسي على نصف ارتفاع الإطار لإجراء عملية القطع الناقص الرياضية
     const semiHeight = maxH / 2;
     const normalizedY = centerYOffset / Math.max(1, semiHeight);
     
-    // التأكد من بقاء القيمة بين -0.99 و 0.99 لتجنب أخطاء الجذر التربيعي
     const clampedY = Math.max(-0.99, Math.min(0.99, normalizedY));
-    const ellipseFactor = Math.sqrt(1 - clampedY * clampedY);
+    let ellipseFactor = Math.sqrt(1 - clampedY * clampedY);
     
-    // معاملات أمان مخصصة لكل شكل لحمايته من التموجات أو المسامير الحادة
     let shapeMultiplier = 1.0;
+    
     if (bubbleType === 'normal_oval') {
-      shapeMultiplier = 0.94; // هامش إضافي للفقاعات البيضاوية الاعتيادية لوجود الذيل
+      shapeMultiplier = 0.94;
+      // التأكد من بقاء حد أدنى للسطر الأول والأخير لتفادي بقاء سطر فارغ أو ضيق
+      ellipseFactor = Math.max(0.55, ellipseFactor);
     } else if (bubbleType === 'circular') {
-      shapeMultiplier = 1.0;  // دائرية نقية مستفيدة من كامل المساحة الهندسية
+      shapeMultiplier = 0.98;
+      ellipseFactor = Math.max(0.50, ellipseFactor);
     } else if (bubbleType === 'thought_cloud') {
-      shapeMultiplier = 0.86; // تفادي نتوءات السحابة الداخلية
+      shapeMultiplier = 0.88;
+      // تلطيف حدة الانحناء لتجعل السطور ممتلئة وعريضة في الأعلى والأسفل لتناسب سحابة التفكير
+      ellipseFactor = Math.max(0.65, Math.pow(ellipseFactor, 0.7));
     } else if (bubbleType === 'spiky_shout') {
-      shapeMultiplier = 0.74; // تفادي المسامير والأسنان الحادة المدببة لفقاعات الصراخ
+      shapeMultiplier = 0.75; // هامش أمان إضافي لحماية الكلمات من زوايا ومسامير الصراخ الحادة
+      ellipseFactor = Math.max(0.48, ellipseFactor);
     }
     
     return maxW * ellipseFactor * padFactor * shapeMultiplier;
   };
 
-  // محاكاة سريعة لحساب عدد الأسطر الإجمالي التقريبي بعد التفاف الكلمات لتحديد حدود الفقاعة بدقة
-  let tempTotalLines = 0;
-  inputLines.forEach(paragraph => {
-    const pWords = paragraph.trim().split(/\s+/).filter(Boolean);
-    if (pWords.length === 0) {
-      tempTotalLines++;
-      return;
-    }
-    let currentLineWords: string[] = [];
-    pWords.forEach(word => {
-      const testLine = [...currentLineWords, word].join(' ');
-      if (measureWidth(testLine) <= maxW * 0.8) {
-        currentLineWords.push(word);
-      } else {
-        tempTotalLines++;
-        currentLineWords = [word];
-      }
-    });
-    if (currentLineWords.length > 0) tempTotalLines++;
+  // تجميع كل كلمات النص المدخلة لفرزها ديناميكياً
+  const allWords: string[] = [];
+  inputLines.forEach(p => {
+    const words = p.trim().split(/\s+/).filter(Boolean);
+    allWords.push(...words);
   });
 
-  const estimatedTotalLines = Math.max(1, tempTotalLines);
-  const finalLines: string[] = [];
-  let currentLineIdx = 0;
+  if (allWords.length === 0) {
+    return { lines: [''], optimalFontSize: fontSize };
+  }
 
-  // التوزيع الفعلي مع احترام الأسطر الفارغة يدوياً وتطبيق الالتفاف الهندسي لكل جزء
-  for (let i = 0; i < inputLines.length; i++) {
-    const paragraph = inputLines[i];
-    const pWords = paragraph.trim().split(/\s+/).filter(Boolean);
+  // توزيع الكلمات ديناميكياً بشكل متوازن تماماً لمنع بقاء كلمة وحيدة في السطر الأخير
+  let bestLines: string[] = [];
+  let minLinesCount = 1;
+  let maxLinesCount = Math.max(1, Math.floor((maxH * (1 - marginPercent / 100)) / lineH));
 
-    // إذا كان السطر فارغاً تماماً (مسافة سطر تركها المستخدم)
-    if (pWords.length === 0) {
-      finalLines.push('');
-      currentLineIdx++;
-      continue;
+  for (let linesCount = minLinesCount; linesCount <= maxLinesCount; linesCount++) {
+    let currentLines: string[] = [];
+    let wordIndex = 0;
+    let success = true;
+
+    for (let lineIndex = 0; lineIndex < linesCount; lineIndex++) {
+      if (wordIndex >= allWords.length) break;
+
+      const limit = getWidthLimit(lineIndex, linesCount);
+      let currentLineWords: string[] = [];
+      
+      while (wordIndex < allWords.length) {
+        const nextWord = allWords[wordIndex];
+        const testLine = [...currentLineWords, nextWord].join(' ');
+        if (measureWidth(testLine) <= limit) {
+          currentLineWords.push(nextWord);
+          wordIndex++;
+        } else {
+          break;
+        }
+      }
+
+      if (currentLineWords.length === 0) {
+        success = false;
+        break;
+      }
+      currentLines.push(currentLineWords.join(' '));
     }
 
-    let currentLineWords: string[] = [];
-    for (let w = 0; w < pWords.length; w++) {
-      const word = pWords[w];
-      const testLine = [...currentLineWords, word].join(' ');
-      const limit = getWidthLimit(currentLineIdx, estimatedTotalLines);
+    if (success && wordIndex >= allWords.length) {
+      bestLines = currentLines;
+      break; // تم العثور على التوزيع الأنسب والأكثر موازنةً بين السطور!
+    }
+  }
 
+  // في حال فشل الالتفاف الهندسي الدقيق للفقاعة، نلجأ للتقسيم العادي السليم كخطة احتياطية
+  if (bestLines.length === 0) {
+    let currentLineWords: string[] = [];
+    let lineIndex = 0;
+    for (let w = 0; w < allWords.length; w++) {
+      const word = allWords[w];
+      const testLine = [...currentLineWords, word].join(' ');
+      const limit = getWidthLimit(lineIndex, 3);
       if (measureWidth(testLine) <= limit) {
         currentLineWords.push(word);
       } else {
         if (currentLineWords.length > 0) {
-          finalLines.push(currentLineWords.join(' '));
+          bestLines.push(currentLineWords.join(' '));
         }
         currentLineWords = [word];
-        currentLineIdx++;
+        lineIndex++;
       }
     }
     if (currentLineWords.length > 0) {
-      finalLines.push(currentLineWords.join(' '));
-      currentLineIdx++;
+      bestLines.push(currentLineWords.join(' '));
     }
   }
 
-  return { lines: finalLines, optimalFontSize: fontSize };
+  return { lines: bestLines, optimalFontSize: fontSize };
 }
 
 export function calculateOptimalFontSizeForShape(
@@ -291,7 +308,6 @@ export function calculateOptimalFontSizeForShape(
     );
 
     const totalLinesHeight = lines.length * mid * lineHeight;
-    // التأكد من ملاءمة الارتفاع الإجمالي أيضاً تماشياً مع الهامش الرأسي المطلوب
     if (totalLinesHeight <= containerHeight * padFactor && lines.length > 0) {
       bestFontSize = mid;
       bestText = lines.join('\n');
