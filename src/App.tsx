@@ -213,7 +213,7 @@ export default function App() {
 
   // معلومات وقناع العصا السحرية للفقاعة المكتشفة
   const [wandMask, setWandMask] = useState<Uint8Array | null>(null);
-  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular' | null>(null);
+  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null>(null); // 👈 تحديث دائرية لـ بيضاوية رأسية vertical_oval
   const [autoApplyBubbleStyle, setAutoApplyBubbleStyle] = useState<boolean>(true);
   const [edgeSegments, setEdgeSegments] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>>([]);
   
@@ -225,7 +225,7 @@ export default function App() {
     bboxH: number; 
     scaleX: number; 
     scaleY: number; 
-    shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular';
+    shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval'; // 👈 بيضاوية رأسية
     mask?: Uint8Array;
   }>>([]);
 
@@ -1114,7 +1114,7 @@ export default function App() {
     }
 
     const aspect = foundW / foundH;
-    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular' = 'normal_oval';
+    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval'; // 👈 تغيير circular إلى بيضاوية رأسية vertical_oval
     if (activePixels > 0) {
       const centerX = sumX / activePixels;
       const centerY = sumY / activePixels;
@@ -1145,8 +1145,8 @@ export default function App() {
         bType = 'spiky_shout';
       } else if (shapeCV > 0.082 && segments.length / Math.sqrt(bboxArea) > 3.0) {
         bType = 'thought_cloud';
-      } else if (aspect >= 0.8 && aspect <= 1.25) {
-        bType = 'circular';
+      } else if (aspect >= 0.5 && aspect <= 1.45) { // 👈 تمكين الكشف والتمييز التلقائي ليكون أكثر دقة للفقاعة الدائرية والعمودية الطويلة معاً
+        bType = 'vertical_oval'; // 👈 التبديل لنمط بيضاوية رأسية
       } else {
         bType = 'normal_oval';
       }
@@ -1241,7 +1241,7 @@ export default function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { imgW, imgH, dispW, dispH, x: minX, y: minY, w: foundW, h: foundH } = wandDimensions;
+    const { imgW, imgH, dispW, dispH, x: minX, y: minY, w: foundW, h: hSize } = wandDimensions;
     const dsx = dispW / imgW;
     const dsy = dispH / imgH;
 
@@ -1250,7 +1250,7 @@ export default function App() {
 
       const id = ctx.createImageData(canvas.width, canvas.height);
       const d = id.data;
-      const maxY = minY + foundH;
+      const maxY = minY + hSize;
       const maxX = minX + foundW;
 
       for (let y = minY; y <= maxY; y++) {
@@ -2507,14 +2507,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'circular') {
+        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape,
+          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
@@ -2932,15 +2932,15 @@ export default function App() {
     }
   };
 
-  // 📐 دالة تبديل شكل الفقاعة يدوياً وإعادة التفاف النص المكتوب بداخلها فوراً ليتطابق مع صورك
-  const handleSelectBubbleShape = (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular') => {
+  // 📐 دالة تبديل شكل الفقاعة يدوياً وإعادة التفاف النص المكتوب بداخلها فوراً ليتطابق مع صورك ورغبتك
+  const handleSelectBubbleShape = (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval') => {
     setDetectedBubbleType(shape);
     
-    addToast(`✓ تم تبديل شكل الفقاعة يدوياً لـ: ${
-      shape === 'normal_oval' ? 'بيضاوية 💬' : 
-      shape === 'spiky_shout' ? 'صراخ 💥' : 
-      shape === 'thought_cloud' ? 'تفكير 💭' : 
-      shape === 'narrative_box' ? 'صندوق مستطيل 📜' : 'دائرية نقية 🔵'
+    addToast(`✓ تم تبديل شكل الفقاعة لـ: ${
+      shape === 'normal_oval' ? 'بيضاوية عادية 💬' : 
+      shape === 'spiky_shout' ? 'صراخ حماسية 💥' : 
+      shape === 'thought_cloud' ? 'تفكير سحابية 💭' : 
+      shape === 'narrative_box' ? 'صندوق مستطيل 📜' : 'بيضاوية رأسية 🔵'
     } 📐`, 'success');
 
     // إذا كانت هناك طبقة نصوص نشطة ومحددة حالياً، نقوم بطلب إعادة تدوير والتفاف النص فوراً
@@ -2951,7 +2951,7 @@ export default function App() {
       const layerHeight = parseFloat(activeLayer.height) || 80;
 
       const opt = calculateOptimalFontSizeForShape(
-        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة
+        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة التلقائية
         activeLayer.text.replace(/\n/g, ' '),
         shape,
         layerWidth,
