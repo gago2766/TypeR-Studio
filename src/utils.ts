@@ -63,14 +63,24 @@ export function calculateOptimalFontSize(
   return best;
 }
 
-// الروابط العربية المتناسقة التي تقبل التمديد والاتصال الأمامي
-const TATWEEL_CONNECTORS = new Set('بتثجحخسشصضطظعغفقكلمنهي'.split(''));
+// استبعاد التاء المربوطة والهمزة على السطر من قائمة الحروف المتصلة باليسار لمنع التمطيط بعدها
+const TATWEEL_CONNECTORS = new Set('بتثجحخسشصضطظعغفقكلمنهيئ'.split(''));
 
 export function canTatweel(ch: string): boolean {
   return TATWEEL_CONNECTORS.has(ch);
 }
 
-// 🧠 خوارزمية ذكية تمدد الكلمات الطويلة فقط لوزن السطور وجعلها تتلامس مع حواف الفقاعة بنسبة 100%
+// دالة مساعدة لفصل الكلمة العربية عن أي علامات ترقيم تحيط بها لضمان دقة حساب طول الكلمة
+function splitWord(word: string) {
+  const prefixMatch = word.match(/^[^\u0621-\u064A\u0671-\u06D3]+/);
+  const suffixMatch = word.match(/[^\u0621-\u064A\u0671-\u06D3]+$/);
+  const prefix = prefixMatch ? prefixMatch[0] : '';
+  const suffix = suffixMatch ? suffixMatch[0] : '';
+  const core = word.substring(prefix.length, word.length - suffix.length);
+  return { prefix, core, suffix };
+}
+
+// خوارزمية ذكية ومتطورة لتوزيع الكشيدات والتمطيط بالتساوي عبر الكلمات الكبيرة فقط
 export function tatweelLine(
   text: string,
   targetWidth: number,
@@ -84,17 +94,21 @@ export function tatweelLine(
   
   ctx.font = `${fontSize}px ${fontFamily}`;
   let currentWidth = ctx.measureText(words.join(' ')).width;
-  if (currentWidth >= targetWidth * 0.96) return text; // السطر متناسق بالفعل
+  if (currentWidth >= targetWidth * 0.96) return text; // النص مناسب للمساحة ولا يحتاج لتمطيط إضافي
 
-  // العثور على مواضع التمديد المؤهلة بشرط أن تكون الكلمة كبيرة
+  // العثور على جميع الحروف والروابط القابلة للمد والتمطيط داخل الكلمات لتوزيع متناسق
   const eligiblePositions: Array<{ wordIndex: number; charIndex: number }> = [];
   words.forEach((word, wordIdx) => {
-    // 👈 ضعه فقط في الكلمات الكبيرة (5 أحرف أو أكثر) واستبعد الكلمات ذات الـ 2 و 3 و 4 أحرف
-    if (word.length >= 5) {
-      // 👈 حماية أطراف الكلمات: لا تضع التمديد في نهاية أو قبل نهاية الكلمة أبداً (i < word.length - 2)
-      for (let i = 0; i < word.length - 2; i++) {
-        if (canTatweel(word[i])) {
-          eligiblePositions.push({ wordIndex: wordIdx, charIndex: i });
+    const parts = splitWord(word);
+    // تفعيل التمطيط للكلمات الكبيرة فقط (5 أحرف أو أكثر) واستبعاد الكلمات القصيرة (2 أو 3 أو 4 أحرف)
+    if (parts.core.length >= 5) {
+      // إيقاف التمطيط قبل نهاية الكلمة (المرور حتى الحرف قبل الأخير فقط)
+      for (let i = 0; i < parts.core.length - 1; i++) {
+        if (canTatweel(parts.core[i])) {
+          eligiblePositions.push({ 
+            wordIndex: wordIdx, 
+            charIndex: parts.prefix.length + i 
+          });
         }
       }
     }
@@ -102,14 +116,14 @@ export function tatweelLine(
 
   if (eligiblePositions.length === 0) return text;
 
-  // إدخال الكشيدات بالتناوب لتمديد السطر بانسجام تام ومطابقة العرض بنسبة 100%
+  // إدخال الكشيدات تدريجياً وبالتناوب على جميع المواضع المؤهلة لوزن الأسطر هندسياً
   let attempts = 0;
   const maxAttempts = strength * 25;
 
   while (attempts < maxAttempts) {
     currentWidth = ctx.measureText(words.join(' ')).width;
     if (currentWidth >= targetWidth * 0.97) {
-      break; // تم الوصول للعرض الهندسي المثالي
+      break; // تم الوصول للعرض الهندسي المثالي للسطر بنجاح
     }
 
     const pos = eligiblePositions[attempts % eligiblePositions.length];
@@ -117,7 +131,7 @@ export function tatweelLine(
     
     words[pos.wordIndex] = word.slice(0, pos.charIndex + 1) + TATWEEL + word.slice(pos.charIndex + 1);
     
-    // تحديث إزاحة الحروف للكلمة الممتدة
+    // تحديث إزاحة المواضع المتبقية للكلمة التي تم تمطيطها
     eligiblePositions.forEach(p => {
       if (p.wordIndex === pos.wordIndex && p.charIndex > pos.charIndex) {
         p.charIndex += 1;
@@ -131,7 +145,7 @@ export function tatweelLine(
 
 export function wrapTextToShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // بيضاوية رأسية vertical_oval
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval',
   maxW: number,
   maxH: number,
   fontSize: number,
@@ -184,16 +198,12 @@ export function wrapTextToShape(
     let ratio = 1.0;
     
     if (bubbleType === 'normal_oval') {
-      // بيضاوية عادية: تناقص متناسق وسلس؛ الأطراف بنسبة 0.45 والسطور المتوسطة بنسبة 0.80
       ratio = 1 - 0.55 * Math.pow(t, 1.25);
     } else if (bubbleType === 'vertical_oval') {
-      // بيضاوية رأسية مطولة: انحناء حاد وعميق للأطراف؛ الأطراف بنسبة 0.30 والمتوسطة بنسبة 0.65 والمركزية بنسبة 0.90
       ratio = 1 - 0.68 * Math.pow(t, 1.15);
     } else if (bubbleType === 'thought_cloud') {
-      // تفكير سحابية: انتفاخ عريض وممتلئ؛ الأطراف بنسبة 0.55 والمتوسطة بنسبة 0.85
       ratio = 1 - 0.45 * Math.pow(t, 1.3);
     } else if (bubbleType === 'spiky_shout') {
-      // صراخ حماسية: شكل برميلي عريض ومحمي من الأشواك؛ الأطراف بنسبة 0.45 والمتوسطة بنسبة 0.80 مع هامش أمان داخلي
       ratio = (1 - 0.55 * Math.pow(t, 2.0)) * 0.75;
     }
     
@@ -274,12 +284,11 @@ export function wrapTextToShape(
     }
   }
 
-  // 👈 تطبيق تمطيط الأسطر (الكشيدة) تلقائياً لتوسيع الحروف حتى تملأ المساحة الهندسية المخصصة لكل سطر بنسبة 100% ومطابقة للرسومات
-  // (تم تمكين التمطيط التلقائي للصندوق المستطيل لضمان اصطفاف أسطره بنفس الحجم تماماً!)
+  // تطبيق تمطيط الأسطر تلقائياً؛ تم شمل فقاعة الصندوق (narrative_box) هنا لتتساوى كافة أسطرها تماماً
   const stretchedLines = bestLines.map((line, idx) => {
     if (!line.trim()) return line;
     const limit = getWidthLimit(idx, bestLines.length);
-    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 5); // تم استخدام قوة تمطيط مخصصة للصندوق لوزن حوافه بدقة متناهية
+    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
   });
 
   return { lines: stretchedLines, optimalFontSize: fontSize };
@@ -287,7 +296,7 @@ export function wrapTextToShape(
 
 export function calculateOptimalFontSizeForShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 بيضاوية رأسية vertical_oval
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval',
   containerWidth: number,
   containerHeight: number,
   fontFamily: string,
@@ -381,6 +390,26 @@ export async function getFonts(): Promise<StoredFont[]> {
     });
   } catch (error) {
     console.error('Error loading fonts from IndexedDB:', error);
+    return [];
+  }
+}
+
+// دالة لحفظ الخطوط المفضلة بشكل تلقائي ومستمر
+export function saveFavoriteFonts(favs: string[]): void {
+  try {
+    localStorage.setItem('typer_studio_fav_fonts', JSON.stringify(favs));
+  } catch (e) {
+    console.error('Error saving favorite fonts:', e);
+  }
+}
+
+// دالة لاسترجاع الخطوط المفضلة عند تشغيل التطبيق
+export function getFavoriteFonts(): string[] {
+  try {
+    const favs = localStorage.getItem('typer_studio_fav_fonts');
+    return favs ? JSON.parse(favs) : [];
+  } catch (e) {
+    console.error('Error getting favorite fonts:', e);
     return [];
   }
 }
