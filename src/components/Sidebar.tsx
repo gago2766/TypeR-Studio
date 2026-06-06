@@ -100,7 +100,11 @@ interface SidebarProps {
   // Whiten wand selection props
   onWhitenWandSelection?: () => void;
   hasWandMask?: boolean;
-  onAIInpaint?: () => void; // 👈 إضافة الخاصية لاستدعاء الممحاة الذكية بالذكاء الاصطناعي
+  onAIInpaint?: () => void;
+
+  // 📐 إضافة ميزات التحكم وتحديد شكل الفقاعة يدوياً وتلقائياً لمطابقة صورك بدقة
+  detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular' | null;
+  onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular') => void;
 
   // Bottom action triggers
   onPrevLine: () => void;
@@ -193,7 +197,9 @@ export function Sidebar({
   canDrawingRedo = false,
   onWhitenWandSelection,
   hasWandMask = false,
-  onAIInpaint, // 👈 فك حزمة الخاصية الجديدة المضافة
+  onAIInpaint,
+  detectedBubbleType, // 👈 فك حزمة المتغير الجديد المضاف
+  onSelectBubbleShape, // 👈 فك حزمة الدالة الجديدة المضافة
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -1082,6 +1088,78 @@ export function Sidebar({
           >
             محاذاة [Ctrl+A]
           </button>
+        </div>
+
+        {/* 📐 شريط الأشكال الخمسة لاختيار وتعديل التنسيق يدوياً لمطابقة الصور بدقة */}
+        <div className="flex flex-col gap-1 border-t border-[#2d2d2d]/40 pt-2 mt-1 select-none">
+          <span className="text-[10px] text-gray-500 font-bold mb-1 text-right">📐 نمط شكل الفقاعة النشط:</span>
+          <div className="grid grid-cols-5 gap-1 text-center" id="custom-shape-selector-footer">
+            <button
+              type="button"
+              onClick={() => onSelectBubbleShape('normal_oval')}
+              className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                detectedBubbleType === 'normal_oval' 
+                  ? 'bg-[#007acc] text-white border border-[#0098ff]' 
+                  : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
+              }`}
+              title="تطبيق نمط التنسيق البيضاوي العادي"
+            >
+              <span className="text-[11px]">💬</span>
+              <span>بيضاوية</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectBubbleShape('spiky_shout')}
+              className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                detectedBubbleType === 'spiky_shout' 
+                  ? 'bg-[#007acc] text-white border border-[#0098ff]' 
+                  : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
+              }`}
+              title="تطبيق نمط تنسيق فقاعة الصراخ الحماسية"
+            >
+              <span className="text-[11px]">💥</span>
+              <span>صراخ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectBubbleShape('thought_cloud')}
+              className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                detectedBubbleType === 'thought_cloud' 
+                  ? 'bg-[#007acc] text-white border border-[#0098ff]' 
+                  : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
+              }`}
+              title="تطبيق نمط تنسيق فقاعة التفكير السحابية"
+            >
+              <span className="text-[11px]">💭</span>
+              <span>تفكير</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectBubbleShape('narrative_box')}
+              className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                detectedBubbleType === 'narrative_box' 
+                  ? 'bg-[#007acc] text-white border border-[#0098ff]' 
+                  : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
+              }`}
+              title="تطبيق نمط تنسيق صندوق السرد المستطيل"
+            >
+              <span className="text-[11px]">📜</span>
+              <span>صندوق</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectBubbleShape('circular')}
+              className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                detectedBubbleType === 'circular' 
+                  ? 'bg-[#007acc] text-white border border-[#0098ff]' 
+                  : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
+              }`}
+              title="تطبيق نمط التنسيق الدائري"
+            >
+              <span className="text-[11px]">🔵</span>
+              <span>دائرية</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
