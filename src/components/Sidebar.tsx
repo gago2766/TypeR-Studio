@@ -103,8 +103,8 @@ interface SidebarProps {
   onAIInpaint?: () => void;
 
   // 📐 إضافة ميزات التحكم وتحديد شكل الفقاعة يدوياً وتلقائياً لمطابقة صورك بدقة
-  detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular' | null;
-  onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular') => void;
+  detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null; // 👈 بيضاوية رأسية vertical_oval
+  onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval') => void; // 👈 بيضاوية رأسية vertical_oval
 
   // Bottom action triggers
   onPrevLine: () => void;
@@ -1148,16 +1148,16 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              onClick={() => onSelectBubbleShape('circular')}
+              onClick={() => onSelectBubbleShape('vertical_oval')} // 👈 بيضاوية رأسية
               className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
-                detectedBubbleType === 'circular' 
+                detectedBubbleType === 'vertical_oval' 
                   ? 'bg-[#007acc] text-white border border-[#0098ff]' 
                   : 'bg-[#222] border border-[#333] hover:bg-[#333] text-gray-400'
               }`}
-              title="تطبيق نمط التنسيق الدائري"
+              title="تطبيق نمط التنسيق البيضاوي الرأسي المطول"
             >
               <span className="text-[11px]">🔵</span>
-              <span>دائرية</span>
+              <span>رأسية</span>
             </button>
           </div>
         </div>
