@@ -1234,14 +1234,14 @@ export default function App() {
       ctx.stroke();
 
       ctx.strokeStyle = '#000000';
-          ctx.lineDashOffset = -(matchOffsetRef.current + 4);
-          ctx.beginPath();
-          edgeSegments.forEach(s => {
-            ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
-            ctx.lineTo(s.x2 * dsx, s.y2 * dsy); // 👈 تم تصحيح الارتفاع بنجاح هنا
-          });
-          ctx.stroke();
-          ctx.restore();
+      ctx.lineDashOffset = -(matchOffsetRef.current + 4);
+      ctx.beginPath();
+      edgeSegments.forEach(s => {
+        ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
+        ctx.lineTo(s.x2 * dsx, s.y2 * dsy); // 👈 تم تصحيح الارتفاع بنجاح هنا
+      });
+      ctx.stroke();
+      ctx.restore();
 
       matchOffsetRef.current = (matchOffsetRef.current + 0.45) % 8;
       rAFRef.current = requestAnimationFrame(tick);
@@ -2806,7 +2806,17 @@ export default function App() {
       }
     } catch (err: any) {
       console.error('AI Inpainting Error:', err);
-      addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${err.message || err}`, 'error');
+      let errMsg = err.message || err;
+      if (typeof errMsg === 'object') {
+        errMsg = JSON.stringify(errMsg);
+      }
+      
+      // الكشف الذكي عن خطأ الحظر الجغرافي من Google لـ Egypt / Europe
+      if (errMsg.includes("Image generation is not available") || errMsg.includes("FAILED_PRECONDITION")) {
+        addToast('❌ حظر جغرافي من Google: ميزة تعديل وتوليد الصور غير متاحة في منطقتك حالياً (مثل مصر والشرق الأوسط). لتشغيلها، يرجى تفعيل أي تطبيق VPN (على دولة تدعم الخدمة كأمريكا 🇺🇸) ثم أعد المحاولة!', 'error');
+      } else {
+        addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${errMsg}`, 'error');
+      }
     }
   };
 
@@ -3388,24 +3398,59 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5">
-            <button
-              onClick={() => handlePageChange(currentPageIndex - 1)}
-              disabled={currentPageIndex <= 0}
-              className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
-            >
-              &lt;
-            </button>
-            <span className="px-3 font-semibold text-[11px]">
-              {pages.length > 0 ? `${currentPageIndex + 1} / ${pages.length}` : '0 / 0'}
-            </span>
-            <button
-              onClick={() => handlePageChange(currentPageIndex + 1)}
-              disabled={currentPageIndex === -1 || currentPageIndex >= pages.length - 1}
-              className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
-            >
-              &gt;
-            </button>
+          {/* تجميع زر تقليب الصفحات وشريط الأدوات السريع والثابت معاً في المنتصف بجمالية تامة */}
+          <div className="flex items-center gap-4">
+            {/* 🛠️ شريط الأدوات السريع والثابت المطور لتسريع الحركة والتبييض */}
+            <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setActiveTool('hand')}
+                className={`py-1 px-2.5 rounded text-[11px] font-bold transition focus:outline-none cursor-pointer ${
+                  activeTool === 'hand' ? 'bg-[#007acc] text-white' : 'hover:bg-[#333] text-gray-300'
+                }`}
+              >
+                ✋ اليد
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTool('brush')}
+                className={`py-1 px-2.5 rounded text-[11px] font-bold transition focus:outline-none cursor-pointer ${
+                  activeTool === 'brush' ? 'bg-[#007acc] text-white' : 'hover:bg-[#333] text-gray-300'
+                }`}
+              >
+                🖌️ الفرشاة
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTool('magic_wand')}
+                className={`py-1 px-2.5 rounded text-[11px] font-bold transition focus:outline-none cursor-pointer ${
+                  activeTool === 'magic_wand' ? 'bg-[#007acc] text-white' : 'hover:bg-[#333] text-gray-300'
+                }`}
+              >
+                🪄 العصا
+              </button>
+            </div>
+
+            {/* زري تقليب الصفحات */}
+            <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5">
+              <button
+                onClick={() => handlePageChange(currentPageIndex - 1)}
+                disabled={currentPageIndex <= 0}
+                className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
+              >
+                &lt;
+              </button>
+              <span className="px-3 font-semibold text-[11px]">
+                {pages.length > 0 ? `${currentPageIndex + 1} / ${pages.length}` : '0 / 0'}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPageIndex + 1)}
+                disabled={currentPageIndex === -1 || currentPageIndex >= pages.length - 1}
+                className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
+              >
+                &gt;
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -3521,7 +3566,7 @@ export default function App() {
         setScriptInput={setScriptInput}
         parsedLines={parsedLines}
         currentLineIndex={currentLineIndex}
-        onSelectLine={handleSelectLine}
+        onSelectLine={onSelectLine}
         folders={folders}
         setFolders={setFolders}
         selectedStyleId={selectedStyleId}
@@ -3597,3 +3642,4 @@ export default function App() {
     </div>
   );
 }
+
