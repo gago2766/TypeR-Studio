@@ -41,7 +41,9 @@ import {
   wrapTextToShape,
   calculateOptimalFontSizeForShape,
   getFonts,
-  saveFont
+  saveFont,
+  saveFavoriteFonts,
+  getFavoriteFonts
 } from './utils';
 
 import { FontManager } from './components/FontManager';
@@ -196,8 +198,17 @@ export default function App() {
 
   // إدارة وتفضيل الخطوط المخصصة
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
-  const [favFonts, setFavFonts] = useState<string[]>([]);
+  
+  // استعادة الخطوط المفضلة تلقائيًا من الذاكرة المحلية عند بدء التشغيل
+  const [favFonts, setFavFonts] = useState<string[]>(() => {
+    return getFavoriteFonts();
+  });
   const [showFontManager, setShowFontManager] = useState<boolean>(false);
+
+  // حفظ الخطوط المفضلة تلقائياً في الذاكرة المحلية عند أي تعديل عليها
+  useEffect(() => {
+    saveFavoriteFonts(favFonts);
+  }, [favFonts]);
 
   // قوالب الأشكال الجاهزة
   const [presets, setPresets] = useState<ShapePreset[]>(INITIAL_PRESETS);
@@ -3798,4 +3809,3 @@ export default function App() {
     </div>
   );
 }
-
