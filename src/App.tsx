@@ -2232,7 +2232,8 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        ctx.drawImage(imgEl, 0, 0);
+        // 👈 تم إرجاع المتغير المعرف للتصدير (exportImg) بدلاً من (imgEl) لتفادي أخطاء تجميد الواجهة والـ Compile
+        ctx.drawImage(exportImg, 0, 0);
 
         const imgEl = document.getElementById('manga-img') as HTMLImageElement;
         const dispW = imgEl?.offsetWidth || 600;
