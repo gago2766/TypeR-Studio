@@ -1086,7 +1086,7 @@ export default function App() {
         const isEdge = left !== right;
 
         if (isEdge && !inRun) {
-          inRun = true;
+          isEdge = true;
           rStart = y;
         }
         if (!isEdge && inRun) {
@@ -1164,6 +1164,51 @@ export default function App() {
       h: foundH,
     });
 
+    // 👈 ربط وتحديث الطبقة النصية النشطة المحددة فوراً عند التحديد بالعصا السحرية لتبسيط العمل وتوزيع الحروف تلقائياً
+    if (activeLayer && !multiBubbleMode) {
+      const previousLayers = [...currentLayers];
+      
+      const targetLeft = minX / scaleX;
+      const targetTop = minY / scaleY;
+      const targetW = foundW / scaleX;
+      const targetH = foundH / scaleY;
+
+      const marginRatio = bubbleMargin / 100;
+      const padX = targetW * marginRatio;
+      const padY = targetH * marginRatio;
+      const layerLeft = targetLeft + padX;
+      const layerTop = targetTop + padY;
+      const layerWidth = Math.max(20, targetW - padX * 2);
+      const layerHeight = Math.max(20, targetH - padY * 2);
+
+      const opt = calculateOptimalFontSizeForShape(
+        // إزالة فواصل الأسطر لتوزيع الكلمات ديناميكياً بدقة
+        activeLayer.text.replace(/\n/g, ' '),
+        bType,
+        layerWidth,
+        layerHeight,
+        activeLayer.style.fontFamily,
+        activeLayer.style.lineHeight,
+        parseFloat(activeLayer.style.letterSpacing) || 0,
+        bubbleMargin
+      );
+
+      handleUpdateLayer(activeLayer.id, {
+        left: `${layerLeft}px`,
+        top: `${layerTop}px`,
+        width: `${layerWidth}px`,
+        height: `${layerHeight}px`,
+        text: opt.textWithBreaks,
+        style: {
+          ...activeLayer.style,
+          fontSize: autoFitText ? `${opt.fontSize}px` : activeLayer.style.fontSize,
+        },
+      });
+
+      pushToHistory(previousLayers);
+      addToast('✓ تم ملائمة وتوسيط النص للفقاعة الجديدة تلقائياً! 📐💬', 'success');
+    }
+
     if (multiBubbleMode) {
       setBubbleQueue(prev => [...prev, {
         bboxX: minX,
@@ -1179,7 +1224,10 @@ export default function App() {
       // تم تعطيل المسح الفوري ليبقى شريط الأدوات والتحديد نشطاً فوق آخر فقاعة مضافة لتسهيل الحركة
       // clearWandSelection();
     } else {
-      addToast('✓ تم تحديد الفقاعة نجاحاً بالعصا');
+      // إظهار التنبيه فقط في حال عدم وجود طبقة نشطة يتم تحديثها تلقائياً
+      if (!activeLayer) {
+        addToast('✓ تم تحديد الفقاعة نجاحاً بالعصا');
+      }
     }
   };
 
@@ -3733,6 +3781,8 @@ export default function App() {
         onWhitenWandSelection={handleWhitenWandSelection}
         hasWandMask={wandMask !== null}
         onAIInpaint={handleAIInpaint} // 👈 ربط الدالة بالـ Sidebar الجديد بشكل مباشر وسليم
+        detectedBubbleType={detectedBubbleType} // 👈 تمرير الخصيصة المضافة حديثاً لمنع الأخطاء البرمجية
+        onSelectBubbleShape={onSelectBubbleShape} // 👈 تمرير الدالة المضافة حديثاً لمنع الأخطاء البرمجية
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -3748,3 +3798,4 @@ export default function App() {
     </div>
   );
 }
+
