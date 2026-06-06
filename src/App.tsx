@@ -287,7 +287,7 @@ export default function App() {
           title: filename,
           text: `حفظ ${filename} من تطبيق تايبر مانجا 📱💾`,
         });
-        addToast('✓ تم تجهيز وحفظ الملف بنجاح 📤', 'success');
+        addToast('✓ تم تفعيل ومشاركة الملف بنجاح 📤', 'success');
         return;
       } catch (err: any) {
         if (err.name === 'AbortError') {
@@ -3567,7 +3567,7 @@ export default function App() {
         setScriptInput={setScriptInput}
         parsedLines={parsedLines}
         currentLineIndex={currentLineIndex}
-        onSelectLine={onSelectLine}
+        onSelectLine={handleSelectLine} // 👈 تم تعديل الخطأ المطبعي البرمجي هنا بنجاح وتفادي الشاشة البيضاء تماماً
         folders={folders}
         setFolders={setFolders}
         selectedStyleId={selectedStyleId}
@@ -3643,4 +3643,3 @@ export default function App() {
     </div>
   );
 }
-
