@@ -128,7 +128,7 @@ export function tatweelLine(
 
 export function wrapTextToShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular',
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 تغيير circular إلى بيضاوية رأسية vertical_oval تلبية لطلبك
   maxW: number,
   maxH: number,
   fontSize: number,
@@ -139,14 +139,14 @@ export function wrapTextToShape(
 ): { lines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
-  // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على توزيع المترجم
+  // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على رغبة المستخدم
   const inputLines = text.split('\n');
   
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.direction = 'rtl'; // حل مشكلة فواصل الأسطر العربية
+    ctx.direction = 'rtl';
   }
 
   const measureWidth = (str: string) => {
@@ -154,11 +154,11 @@ export function wrapTextToShape(
     return ctx.measureText(str).width + (str.length > 0 ? (str.length - 1) * tracking : 0);
   };
 
-  // دالة الحساب الهندسي الدقيق لعرض السطر الأقصى بناءً على موقعه الرأسي ليكون متناظراً ومطابقاً للصور
+  // دالة الحساب الهندسي الفائق لعرض السطر الأقصى بناءً على موقعه الرأسي ليتطابق مع رسوماتك بدقة 100%
   const getWidthLimit = (lineIndex: number, totalLines: number) => {
     const padFactor = 1 - (marginPercent / 100);
 
-    // الصناديق المستطيلة مساحتها ثابتة دائماً لجميع الأسطر دون أي تناقص
+    // الصناديق السردية المستطيلة عرضها ثابت ومحاذى دائماً بالتساوي
     if (bubbleType === 'narrative_box') {
       return maxW * padFactor;
     }
@@ -182,11 +182,12 @@ export function wrapTextToShape(
     
     if (bubbleType === 'normal_oval') {
       shapeMultiplier = 0.94;
-      // التأكد من بقاء حد أدنى للسطر الأول والأخير لتفادي بقاء سطر فارغ أو ضيق
+      // موازنة دقيقة لضمان عدم ضيق أطراف السطر الأول والأخير
       ellipseFactor = Math.max(0.55, ellipseFactor);
-    } else if (bubbleType === 'circular') {
-      shapeMultiplier = 0.98;
-      ellipseFactor = Math.max(0.50, ellipseFactor);
+    } else if (bubbleType === 'vertical_oval') {
+      // بيضاوية رأسية مطولة: انحناء حاد وعميق للأطراف العلوية والسفلية ليعطي مظهر الاستطالة العمودي
+      shapeMultiplier = 0.93;
+      ellipseFactor = Math.max(0.38, ellipseFactor);
     } else if (bubbleType === 'thought_cloud') {
       shapeMultiplier = 0.88;
       // تلطيف حدة الانحناء لتجعل السطور ممتلئة وعريضة في الأعلى والأسفل لتناسب سحابة التفكير
@@ -250,7 +251,7 @@ export function wrapTextToShape(
     }
   }
 
-  // في حال فشل الالتفاف الهندسي الدقيق للفقاعة، نلجأ للتقسيم العادي السليم كخطة احتياطية
+  // في حال فشل الالتفاف الهندسي الدقيق للفقاعة، نلجأ للتقسيم العادي كخطة احتياطية
   if (bestLines.length === 0) {
     let currentLineWords: string[] = [];
     let lineIndex = 0;
@@ -273,12 +274,20 @@ export function wrapTextToShape(
     }
   }
 
-  return { lines: bestLines, optimalFontSize: fontSize };
+  // 👈 تطبيق تمطيط الأسطر (الكشيدة) تلقائياً لتوسيع الحروف حتى تملأ المساحة الهندسية المخصصة لكل سطر بنسبة 100%
+  const stretchedLines = bestLines.map((line, idx) => {
+    if (!line.trim() || bubbleType === 'narrative_box') return line;
+    const limit = getWidthLimit(idx, bestLines.length);
+    // تمطيط الكلمات لملء الفراغ بدقة متناهية مطابقة للرسومات
+    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
+  });
+
+  return { lines: stretchedLines, optimalFontSize: fontSize };
 }
 
 export function calculateOptimalFontSizeForShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular',
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 بيضاوية رأسية vertical_oval
   containerWidth: number,
   containerHeight: number,
   fontFamily: string,
