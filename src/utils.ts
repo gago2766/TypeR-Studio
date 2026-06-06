@@ -63,13 +63,14 @@ export function calculateOptimalFontSize(
   return best;
 }
 
-const TATWEEL_CONNECTORS = new Set('بتثجحخسشصضطظعغفقكلمنهيئةبتثجحخسشصضطظعغفقكلمنهيئ'.split(''));
+// الروابط العربية المتناسقة التي تقبل التمديد والاتصال الأمامي
+const TATWEEL_CONNECTORS = new Set('بتثجحخسشصضطظعغفقكلمنهي'.split(''));
 
 export function canTatweel(ch: string): boolean {
   return TATWEEL_CONNECTORS.has(ch);
 }
 
-// 🧠 خوارزمية ذكية ومتطورة لتوزيع الكشيدات والتمطيط بالتساوي عبر الكلمات حتى تطابق العرض الهندسي بدقة متناهية
+// 🧠 خوارزمية ذكية تمدد الكلمات الطويلة فقط لوزن السطور وجعلها تتلامس مع حواف الفقاعة بنسبة 100%
 export function tatweelLine(
   text: string,
   targetWidth: number,
@@ -83,13 +84,15 @@ export function tatweelLine(
   
   ctx.font = `${fontSize}px ${fontFamily}`;
   let currentWidth = ctx.measureText(words.join(' ')).width;
-  if (currentWidth >= targetWidth * 0.96) return text; // النص مناسب للمساحة ولا يحتاج لتمطيط إضافي
+  if (currentWidth >= targetWidth * 0.96) return text; // السطر متناسق بالفعل
 
-  // العثور على جميع الحروف والروابط القابلة للمد والتمطيط داخل الكلمات لتوزيع متناسق
+  // العثور على مواضع التمديد المؤهلة بشرط أن تكون الكلمة كبيرة
   const eligiblePositions: Array<{ wordIndex: number; charIndex: number }> = [];
   words.forEach((word, wordIdx) => {
-    if (word.length >= 2) {
-      for (let i = 0; i < word.length - 1; i++) {
+    // 👈 ضعه فقط في الكلمات الكبيرة (5 أحرف أو أكثر) واستبعد الكلمات ذات الـ 2 و 3 و 4 أحرف
+    if (word.length >= 5) {
+      // 👈 حماية أطراف الكلمات: لا تضع التمديد في نهاية أو قبل نهاية الكلمة أبداً (i < word.length - 2)
+      for (let i = 0; i < word.length - 2; i++) {
         if (canTatweel(word[i])) {
           eligiblePositions.push({ wordIndex: wordIdx, charIndex: i });
         }
@@ -99,14 +102,14 @@ export function tatweelLine(
 
   if (eligiblePositions.length === 0) return text;
 
-  // إدخال الكشيدات تدريجياً وبالتناوب على جميع المواضع المؤهلة لوزن الأسطر هندسياً بنسبة 100%
+  // إدخال الكشيدات بالتناوب لتمديد السطر بانسجام تام ومطابقة العرض بنسبة 100%
   let attempts = 0;
   const maxAttempts = strength * 25;
 
   while (attempts < maxAttempts) {
     currentWidth = ctx.measureText(words.join(' ')).width;
     if (currentWidth >= targetWidth * 0.97) {
-      break; // تم الوصول للعرض الهندسي المثالي للسطر بنجاح
+      break; // تم الوصول للعرض الهندسي المثالي
     }
 
     const pos = eligiblePositions[attempts % eligiblePositions.length];
@@ -114,7 +117,7 @@ export function tatweelLine(
     
     words[pos.wordIndex] = word.slice(0, pos.charIndex + 1) + TATWEEL + word.slice(pos.charIndex + 1);
     
-    // تحديث إزاحة المواضع المتبقية للكلمة التي تم تمطيطها
+    // تحديث إزاحة الحروف للكلمة الممتدة
     eligiblePositions.forEach(p => {
       if (p.wordIndex === pos.wordIndex && p.charIndex > pos.charIndex) {
         p.charIndex += 1;
@@ -128,7 +131,7 @@ export function tatweelLine(
 
 export function wrapTextToShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 تغيير circular رسمياً إلى vertical_oval
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // بيضاوية رأسية vertical_oval
   maxW: number,
   maxH: number,
   fontSize: number,
@@ -272,10 +275,11 @@ export function wrapTextToShape(
   }
 
   // 👈 تطبيق تمطيط الأسطر (الكشيدة) تلقائياً لتوسيع الحروف حتى تملأ المساحة الهندسية المخصصة لكل سطر بنسبة 100% ومطابقة للرسومات
+  // (تم تمكين التمطيط التلقائي للصندوق المستطيل لضمان اصطفاف أسطره بنفس الحجم تماماً!)
   const stretchedLines = bestLines.map((line, idx) => {
-    if (!line.trim() || bubbleType === 'narrative_box') return line;
+    if (!line.trim()) return line;
     const limit = getWidthLimit(idx, bestLines.length);
-    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
+    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 5); // تم استخدام قوة تمطيط مخصصة للصندوق لوزن حوافه بدقة متناهية
   });
 
   return { lines: stretchedLines, optimalFontSize: fontSize };
