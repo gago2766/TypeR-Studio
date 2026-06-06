@@ -758,7 +758,7 @@ export default function App() {
           ctx.drawImage(cleaningImg, 0, 0);
           applyMerge();
         };
-        cleaningImg.src = cleaningUrl;
+          cleaningImg.src = cleaningUrl;
       } else {
         applyMerge();
       }
@@ -1368,28 +1368,90 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // محاذاة وتوسيط النص ضمن منطقة التحديد اليدوية
+  // محاذاة وتوسيط النص ضمن منطقة التحديد يدوياً أو العصا السحرية للفقاعة المحددة
   const handleAlignText = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
       return;
     }
-    if (!selectionBox || selectionBox.width < 10) {
-      addToast('❌ ارسم منطقة التحديد المستطيل أولاً لتوسيط الطبقة بداخلها يدوياً', 'error');
+
+    const img = document.getElementById('manga-img') as HTMLImageElement;
+    if (!img || img.naturalWidth === 0) return;
+
+    const scaleX = img.naturalWidth / img.offsetWidth;
+    const scaleY = img.naturalHeight / img.offsetHeight;
+
+    let targetLeft = 0;
+    let targetTop = 0;
+    let targetW = 0;
+    let targetH = 0;
+    let isWandAlign = false;
+
+    const hasWand = (wandMask !== null) && wandDimensions;
+    const hasMarquee = selectionBox && selectionBox.width >= 10 && selectionBox.height >= 10;
+
+    if (hasWand && wandDimensions) {
+      targetLeft = wandDimensions.x / scaleX;
+      targetTop = wandDimensions.y / scaleY;
+      targetW = wandDimensions.w / scaleX;
+      targetH = wandDimensions.h / scaleY;
+      isWandAlign = true;
+    } else if (hasMarquee && selectionBox) {
+      targetLeft = selectionBox.left;
+      targetTop = selectionBox.top;
+      targetW = selectionBox.width;
+      targetH = selectionBox.height;
+    } else {
+      addToast('❌ حدد منطقة بالعصا السحرية أو ارسم مستطيل التحديد أولاً لمحاذاة النص بداخلها', 'error');
       return;
     }
 
     const previousLayers = [...currentLayers];
-    const targetW = selectionBox.width;
-    const targetH = selectionBox.height;
 
-    const optSize = calculateOptimalFontSize(activeLayer.text, targetW, targetH, fontFamily, lineHeight, tracking);
+    // تطبيق هوامش الأمان للفقاعة
+    const marginRatio = bubbleMargin / 100;
+    const padX = targetW * marginRatio;
+    const padY = targetH * marginRatio;
+    const layerLeft = targetLeft + padX;
+    const layerTop = targetTop + padY;
+    const layerWidth = Math.max(20, targetW - padX * 2);
+    const layerHeight = Math.max(20, targetH - padY * 2);
+
+    let optSize = parseFloat(activeLayer.style.fontSize) || 16;
+    let newText = activeLayer.text;
+
+    // إذا كانت المحاذاة داخل العصا السحرية، نوزع النص ديناميكياً ليطابق شكل الفقاعة تماماً
+    if (isWandAlign && detectedBubbleType) {
+      const opt = calculateOptimalFontSizeForShape(
+        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة
+        activeLayer.text.replace(/\n/g, ' '),
+        detectedBubbleType,
+        layerWidth,
+        layerHeight,
+        activeLayer.style.fontFamily,
+        activeLayer.style.lineHeight,
+        parseFloat(activeLayer.style.letterSpacing) || 0,
+        bubbleMargin
+      );
+      optSize = opt.fontSize;
+      newText = opt.textWithBreaks;
+    } else {
+      optSize = calculateOptimalFontSize(
+        activeLayer.text,
+        layerWidth,
+        layerHeight,
+        activeLayer.style.fontFamily,
+        activeLayer.style.lineHeight,
+        parseFloat(activeLayer.style.letterSpacing) || 0
+      );
+    }
 
     handleUpdateLayer(activeLayer.id, {
-      left: `${selectionBox.left}px`,
-      top: `${selectionBox.top}px`,
-      width: `${targetW}px`,
-      height: `${targetH}px`,
+      left: `${layerLeft}px`,
+      top: `${layerTop}px`,
+      width: `${layerWidth}px`,
+      height: `${layerHeight}px`,
+      text: newText,
       style: {
         ...activeLayer.style,
         fontSize: autoFitText ? `${optSize}px` : activeLayer.style.fontSize,
@@ -1398,7 +1460,8 @@ export default function App() {
 
     pushToHistory(previousLayers);
     setSelectionBox(null);
-    addToast('تمت محاذاة وتوسيط العنصر ضمن التحديد بنجاح', 'success');
+    clearWandSelection();
+    addToast('تمت محاذاة وتوسيط النص داخل الفقاعة المحددة بنجاح 🎉', 'success');
   };
 
   // تطبيق الكشيدة والتمطيط العربي
@@ -2818,6 +2881,48 @@ export default function App() {
       } else {
         addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${errMsg}`, 'error');
       }
+    }
+  };
+
+  // 📐 دالة تبديل شكل الفقاعة يدوياً وإعادة التفاف النص المكتوب بداخلها فوراً ليتطابق مع صورك
+  const handleSelectBubbleShape = (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'circular') => {
+    setDetectedBubbleType(shape);
+    
+    addToast(`✓ تم تبديل شكل الفقاعة يدوياً لـ: ${
+      shape === 'normal_oval' ? 'بيضاوية 💬' : 
+      shape === 'spiky_shout' ? 'صراخ 💥' : 
+      shape === 'thought_cloud' ? 'تفكير 💭' : 
+      shape === 'narrative_box' ? 'صندوق مستطيل 📜' : 'دائرية نقية 🔵'
+    } 📐`, 'success');
+
+    // إذا كانت هناك طبقة نصوص نشطة ومحددة حالياً، نقوم بطلب إعادة تدوير والتفاف النص فوراً
+    if (activeLayer) {
+      const previousLayers = [...currentLayers];
+      
+      const layerWidth = parseFloat(activeLayer.width) || 120;
+      const layerHeight = parseFloat(activeLayer.height) || 80;
+
+      const opt = calculateOptimalFontSizeForShape(
+        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة
+        activeLayer.text.replace(/\n/g, ' '),
+        shape,
+        layerWidth,
+        layerHeight,
+        activeLayer.style.fontFamily,
+        activeLayer.style.lineHeight,
+        parseFloat(activeLayer.style.letterSpacing) || 0,
+        bubbleMargin
+      );
+
+      handleUpdateLayer(activeLayer.id, {
+        text: opt.textWithBreaks,
+        style: {
+          ...activeLayer.style,
+          fontSize: `${opt.fontSize}px`
+        }
+      });
+
+      pushToHistory(previousLayers);
     }
   };
 
