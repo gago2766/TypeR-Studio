@@ -3161,7 +3161,7 @@ export default function App() {
 
       {/* نافذة خيارات التصدير المخصص للأنماط */}
       {showExportSelectorModal && (
-        <div className="fixed inset-0 bg-black/80 z-[100000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/85 z-[100000] flex items-center justify-center p-4">
           <div className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg p-5 w-full max-w-sm text-right flex flex-col gap-4">
             <h3 className="text-sm font-bold text-white border-b border-[#2d2d2d] pb-2">
               تصدير الأنماط المنسقة
@@ -3782,7 +3782,7 @@ export default function App() {
         hasWandMask={wandMask !== null}
         onAIInpaint={handleAIInpaint} // 👈 ربط الدالة بالـ Sidebar الجديد بشكل مباشر وسليم
         detectedBubbleType={detectedBubbleType} // 👈 تمرير الخصيصة المضافة حديثاً لمنع الأخطاء البرمجية
-        onSelectBubbleShape={onSelectBubbleShape} // 👈 تمرير الدالة المضافة حديثاً لمنع الأخطاء البرمجية
+        onSelectBubbleShape={handleSelectBubbleShape} // 👈 تمرير الدالة المضافة حديثاً لمنع الأخطاء البرمجية
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -3798,4 +3798,3 @@ export default function App() {
     </div>
   );
 }
-
