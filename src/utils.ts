@@ -69,58 +69,58 @@ export function canTatweel(ch: string): boolean {
   return TATWEEL_CONNECTORS.has(ch);
 }
 
+// 🧠 خوارزمية ذكية ومتطورة لتوزيع الكشيدات والتمطيط بالتساوي عبر الكلمات حتى تطابق العرض الهندسي بدقة متناهية
 export function tatweelLine(
   text: string,
   targetWidth: number,
   ctx: CanvasRenderingContext2D,
   fontSize: number,
   fontFamily: string,
-  strength: number
+  strength: number = 4
 ): string {
   const TATWEEL = 'ـ';
   let words = text.split(' ');
   
-  let eligibleIndices: number[] = [];
-  for (let i = 0; i < words.length; i++) {
-    if (words[i].length > 2) {
-      for (let j = 0; j < words[i].length - 1; j++) {
-        if (canTatweel(words[i][j])) {
-          eligibleIndices.push(i);
-          break;
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  let currentWidth = ctx.measureText(words.join(' ')).width;
+  if (currentWidth >= targetWidth * 0.96) return text; // النص مناسب للمساحة ولا يحتاج لتمطيط إضافي
+
+  // العثور على جميع الحروف والروابط القابلة للمد والتمطيط داخل الكلمات لتوزيع متناسق
+  const eligiblePositions: Array<{ wordIndex: number; charIndex: number }> = [];
+  words.forEach((word, wordIdx) => {
+    if (word.length >= 2) {
+      for (let i = 0; i < word.length - 1; i++) {
+        if (canTatweel(word[i])) {
+          eligiblePositions.push({ wordIndex: wordIdx, charIndex: i });
         }
       }
     }
-  }
+  });
 
-  if (eligibleIndices.length === 0) return text;
+  if (eligiblePositions.length === 0) return text;
 
-  eligibleIndices.sort((a, b) => words[b].length - words[a].length);
-  let targetIndices = eligibleIndices.slice(0, 2);
-
+  // إدخال الكشيدات تدريجياً وبالتناوب على جميع المواضع المؤهلة لوزن الأسطر هندسياً بنسبة 100%
   let attempts = 0;
-  const MAX = strength * 15;
+  const maxAttempts = strength * 25;
 
-  while (attempts < MAX) {
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    const w = ctx.measureText(words.join(' ')).width;
-    if (w >= targetWidth * 0.97) break;
+  while (attempts < maxAttempts) {
+    currentWidth = ctx.measureText(words.join(' ')).width;
+    if (currentWidth >= targetWidth * 0.97) {
+      break; // تم الوصول للعرض الهندسي المثالي للسطر بنجاح
+    }
 
-    let inserted = false;
-    let wordIdx = targetIndices[attempts % targetIndices.length];
-    let word = words[wordIdx];
+    const pos = eligiblePositions[attempts % eligiblePositions.length];
+    const word = words[pos.wordIndex];
     
-    for (let j = 0; j < word.length - 1; j++) {
-      if (canTatweel(word[j])) {
-        words[wordIdx] = word.slice(0, j + 1) + TATWEEL + word.slice(j + 1);
-        inserted = true;
-        break;
+    words[pos.wordIndex] = word.slice(0, pos.charIndex + 1) + TATWEEL + word.slice(pos.charIndex + 1);
+    
+    // تحديث إزاحة المواضع المتبقية للكلمة التي تم تمطيطها
+    eligiblePositions.forEach(p => {
+      if (p.wordIndex === pos.wordIndex && p.charIndex > pos.charIndex) {
+        p.charIndex += 1;
       }
-    }
+    });
 
-    if (!inserted) {
-      targetIndices = targetIndices.filter(idx => idx !== wordIdx);
-      if (targetIndices.length === 0) break;
-    }
     attempts++;
   }
   return words.join(' ');
@@ -128,7 +128,7 @@ export function tatweelLine(
 
 export function wrapTextToShape(
   text: string,
-  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 تغيير circular إلى بيضاوية رأسية vertical_oval تلبية لطلبك
+  bubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval', // 👈 تغيير circular رسمياً إلى vertical_oval
   maxW: number,
   maxH: number,
   fontSize: number,
@@ -139,7 +139,7 @@ export function wrapTextToShape(
 ): { lines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
-  // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على رغبة المستخدم
+  // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على رغبة المترجم
   const inputLines = text.split('\n');
   
   const canvas = document.createElement('canvas');
@@ -154,7 +154,7 @@ export function wrapTextToShape(
     return ctx.measureText(str).width + (str.length > 0 ? (str.length - 1) * tracking : 0);
   };
 
-  // دالة الحساب الهندسي الفائق لعرض السطر الأقصى بناءً على موقعه الرأسي ليتطابق مع رسوماتك بدقة 100%
+  // دالة الحساب الهندسي الدقيق لعرض السطر الأقصى بناءً على موقعه الرأسي ومطابقة لصور الـ PDF تماماً
   const getWidthLimit = (lineIndex: number, totalLines: number) => {
     const padFactor = 1 - (marginPercent / 100);
 
@@ -176,28 +176,25 @@ export function wrapTextToShape(
     const normalizedY = centerYOffset / Math.max(1, semiHeight);
     
     const clampedY = Math.max(-0.99, Math.min(0.99, normalizedY));
-    let ellipseFactor = Math.sqrt(1 - clampedY * clampedY);
+    const t = Math.abs(clampedY); // معامل البُعد المتناظر عن المركز
     
-    let shapeMultiplier = 1.0;
+    let ratio = 1.0;
     
     if (bubbleType === 'normal_oval') {
-      shapeMultiplier = 0.94;
-      // موازنة دقيقة لضمان عدم ضيق أطراف السطر الأول والأخير
-      ellipseFactor = Math.max(0.55, ellipseFactor);
+      // بيضاوية عادية: تناقص متناسق وسلس؛ الأطراف بنسبة 0.45 والسطور المتوسطة بنسبة 0.80
+      ratio = 1 - 0.55 * Math.pow(t, 1.25);
     } else if (bubbleType === 'vertical_oval') {
-      // بيضاوية رأسية مطولة: انحناء حاد وعميق للأطراف العلوية والسفلية ليعطي مظهر الاستطالة العمودي
-      shapeMultiplier = 0.93;
-      ellipseFactor = Math.max(0.38, ellipseFactor);
+      // بيضاوية رأسية مطولة: انحناء حاد وعميق للأطراف؛ الأطراف بنسبة 0.30 والمتوسطة بنسبة 0.65 والمركزية بنسبة 0.90
+      ratio = 1 - 0.68 * Math.pow(t, 1.15);
     } else if (bubbleType === 'thought_cloud') {
-      shapeMultiplier = 0.88;
-      // تلطيف حدة الانحناء لتجعل السطور ممتلئة وعريضة في الأعلى والأسفل لتناسب سحابة التفكير
-      ellipseFactor = Math.max(0.65, Math.pow(ellipseFactor, 0.7));
+      // تفكير سحابية: انتفاخ عريض وممتلئ؛ الأطراف بنسبة 0.55 والمتوسطة بنسبة 0.85
+      ratio = 1 - 0.45 * Math.pow(t, 1.3);
     } else if (bubbleType === 'spiky_shout') {
-      shapeMultiplier = 0.75; // هامش أمان إضافي لحماية الكلمات من زوايا ومسامير الصراخ الحادة
-      ellipseFactor = Math.max(0.48, ellipseFactor);
+      // صراخ حماسية: شكل برميلي عريض ومحمي من الأشواك؛ الأطراف بنسبة 0.45 والمتوسطة بنسبة 0.80 مع هامش أمان داخلي
+      ratio = (1 - 0.55 * Math.pow(t, 2.0)) * 0.75;
     }
     
-    return maxW * ellipseFactor * padFactor * shapeMultiplier;
+    return maxW * ratio * padFactor;
   };
 
   // تجميع كل كلمات النص المدخلة لفرزها ديناميكياً
@@ -211,7 +208,7 @@ export function wrapTextToShape(
     return { lines: [''], optimalFontSize: fontSize };
   }
 
-  // توزيع الكلمات ديناميكياً بشكل متوازن تماماً لمنع بقاء كلمة وحيدة في السطر الأخير
+  // توزيع الكلمات ديناميكياً بشكل متوازن تماماً وبناءً على عروض الأسطر المتفاوتة هندسياً
   let bestLines: string[] = [];
   let minLinesCount = 1;
   let maxLinesCount = Math.max(1, Math.floor((maxH * (1 - marginPercent / 100)) / lineH));
@@ -251,7 +248,7 @@ export function wrapTextToShape(
     }
   }
 
-  // في حال فشل الالتفاف الهندسي الدقيق للفقاعة، نلجأ للتقسيم العادي كخطة احتياطية
+  // خطة الاحتياط في حال لم ينجح التقسيم الهندسي المتكامل
   if (bestLines.length === 0) {
     let currentLineWords: string[] = [];
     let lineIndex = 0;
@@ -274,11 +271,10 @@ export function wrapTextToShape(
     }
   }
 
-  // 👈 تطبيق تمطيط الأسطر (الكشيدة) تلقائياً لتوسيع الحروف حتى تملأ المساحة الهندسية المخصصة لكل سطر بنسبة 100%
+  // 👈 تطبيق تمطيط الأسطر (الكشيدة) تلقائياً لتوسيع الحروف حتى تملأ المساحة الهندسية المخصصة لكل سطر بنسبة 100% ومطابقة للرسومات
   const stretchedLines = bestLines.map((line, idx) => {
     if (!line.trim() || bubbleType === 'narrative_box') return line;
     const limit = getWidthLimit(idx, bestLines.length);
-    // تمطيط الكلمات لملء الفراغ بدقة متناهية مطابقة للرسومات
     return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
   });
 
@@ -293,7 +289,7 @@ export function calculateOptimalFontSizeForShape(
   fontFamily: string,
   lineHeight: number,
   tracking: number,
-  marginPercent: number = 10 // القيمة الافتراضية للهامش هي 10%
+  marginPercent: number = 10
 ): { fontSize: number; textWithBreaks: string } {
   let low = 8;
   let high = Math.min(80, Math.floor(containerHeight * 0.9));
