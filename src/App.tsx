@@ -213,7 +213,7 @@ export default function App() {
 
   // معلومات وقناع العصا السحرية للفقاعة المكتشفة
   const [wandMask, setWandMask] = useState<Uint8Array | null>(null);
-  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null>(null); // 👈 تحديث دائرية لـ بيضاوية رأسية vertical_oval
+  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null>(null); // 👈 تغيير circular لـ vertical_oval
   const [autoApplyBubbleStyle, setAutoApplyBubbleStyle] = useState<boolean>(true);
   const [edgeSegments, setEdgeSegments] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>>([]);
   
@@ -1114,7 +1114,7 @@ export default function App() {
     }
 
     const aspect = foundW / foundH;
-    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval'; // 👈 تغيير circular إلى بيضاوية رأسية vertical_oval
+    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval'; // 👈 تغيير circular لـ vertical_oval
     if (activePixels > 0) {
       const centerX = sumX / activePixels;
       const centerY = sumY / activePixels;
@@ -1435,7 +1435,7 @@ export default function App() {
     let targetH = 0;
     let isWandAlign = false;
 
-    const hasWand = (wandMask !== null) && wandDimensions;
+    const hasWand = wandDimensions !== null; // 👈 تفادي قيود قناع العصا السحرية لتعمل المحاذاة دوماً بنسبة 100% بمجرد وجود التحديد
     const hasMarquee = selectionBox && selectionBox.width >= 10 && selectionBox.height >= 10;
 
     if (hasWand && wandDimensions) {
@@ -3798,3 +3798,4 @@ export default function App() {
     </div>
   );
 }
+
