@@ -152,7 +152,8 @@ export function wrapTextToShape(
   fontFamily: string,
   lineHeight: number,
   tracking: number,
-  marginPercent: number = 10 // القيمة الافتراضية للهامش هي 10%
+  marginPercent: number = 10, // القيمة الافتراضية للهامش هي 10%
+  lineCountOverride?: number // 👈 الخاصية الجديدة لتمرير خيار التحديد اليدوي لعدد الأسطر
 ): { lines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
@@ -210,7 +211,7 @@ export function wrapTextToShape(
     return maxW * ratio * padFactor;
   };
 
-  // تجميع كل كلمات النص المدخلة لفرزها ديناميكياً
+  // تجمع كل الكلمات النصية
   const allWords: string[] = [];
   inputLines.forEach(p => {
     const words = p.trim().split(/\s+/).filter(Boolean);
@@ -221,10 +222,11 @@ export function wrapTextToShape(
     return { lines: [''], optimalFontSize: fontSize };
   }
 
-  // توزيع الكلمات ديناميكياً بشكل متوازن تماماً وبناءً على عروض الأسطر المتفاوتة هندسياً
+  // تحديد المدى الحسابي للأسطر (الالتزام بـ lineCountOverride إن وجد)
+  let minLinesCount = lineCountOverride !== undefined ? lineCountOverride : 1;
+  let maxLinesCount = lineCountOverride !== undefined ? lineCountOverride : Math.max(1, Math.floor((maxH * (1 - marginPercent / 100)) / lineH));
+
   let bestLines: string[] = [];
-  let minLinesCount = 1;
-  let maxLinesCount = Math.max(1, Math.floor((maxH * (1 - marginPercent / 100)) / lineH));
 
   for (let linesCount = minLinesCount; linesCount <= maxLinesCount; linesCount++) {
     let currentLines: string[] = [];
@@ -249,19 +251,36 @@ export function wrapTextToShape(
       }
 
       if (currentLineWords.length === 0) {
-        success = false;
-        break;
+        // إذا كانت كلمة واحدة أطول من الحد، ندرجها ونسمح لها بالبقاء في السطر
+        if (wordIndex < allWords.length) {
+          currentLineWords.push(allWords[wordIndex]);
+          wordIndex++;
+        } else {
+          success = false;
+          break;
+        }
       }
       currentLines.push(currentLineWords.join(' '));
     }
 
     if (success && wordIndex >= allWords.length) {
       bestLines = currentLines;
-      break; // تم العثور على التوزيع الأنسب والأكثر موازنةً بين السطور!
+      break;
     }
   }
 
-  // خطة الاحتياط في حال لم ينجح التقسيم الهندسي المتكامل
+  // في حال فرض عدد أسطر يدوي وتعذر حسابه تلقائياً بالتساوي، نلجأ إلى تقسيم تقريبي متوازن
+  if (bestLines.length === 0 && lineCountOverride !== undefined) {
+    const chunkCount = Math.max(1, Math.ceil(allWords.length / lineCountOverride));
+    for (let i = 0; i < lineCountOverride; i++) {
+      const chunk = allWords.slice(i * chunkCount, (i + 1) * chunkCount);
+      if (chunk.length > 0) {
+        bestLines.push(chunk.join(' '));
+      }
+    }
+  }
+
+  // خطة احتياطية عامة
   if (bestLines.length === 0) {
     let currentLineWords: string[] = [];
     let lineIndex = 0;
@@ -284,11 +303,16 @@ export function wrapTextToShape(
     }
   }
 
-  // تطبيق تمطيط الأسطر تلقائياً؛ تم شمل فقاعة الصندوق (narrative_box) هنا لتتساوى كافة أسطرها تماماً
+  // 👈 تطبيق التمطيط (الكشيدة) التلقائي فقط على السطر الأول والسطر الأخير، وعدم المساس بالأسطر المتوسطة
   const stretchedLines = bestLines.map((line, idx) => {
     if (!line.trim()) return line;
     const limit = getWidthLimit(idx, bestLines.length);
-    return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
+    
+    // تفعيل التمطيط للسطر الأول والأخير فقط
+    if (idx === 0 || idx === bestLines.length - 1) {
+      return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
+    }
+    return line;
   });
 
   return { lines: stretchedLines, optimalFontSize: fontSize };
@@ -302,7 +326,8 @@ export function calculateOptimalFontSizeForShape(
   fontFamily: string,
   lineHeight: number,
   tracking: number,
-  marginPercent: number = 10
+  marginPercent: number = 10,
+  lineCountOverride?: number // 👈 نمرر الخاصية هنا لدمجها بمرونة
 ): { fontSize: number; textWithBreaks: string } {
   let low = 8;
   let high = Math.min(80, Math.floor(containerHeight * 0.9));
@@ -322,7 +347,8 @@ export function calculateOptimalFontSizeForShape(
       fontFamily,
       lineHeight,
       tracking,
-      marginPercent
+      marginPercent,
+      lineCountOverride // 👈 التمرير الحسابي المباشر
     );
 
     const totalLinesHeight = lines.length * mid * lineHeight;
