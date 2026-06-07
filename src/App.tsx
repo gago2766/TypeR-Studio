@@ -1043,8 +1043,7 @@ export default function App() {
         lx > 0 ? pos - 1 : -1,
         lx < localW - 1 ? pos + 1 : -1,
         ly > 0 ? pos - localW : -1,
-        ly < localH - 1 ? pos + localW : -1,
-      ];
+        ly < localH - 1 ? pos + localW : -1;
 
       for (let k = 0; k < 4; k++) {
         const np = neighbors[k];
@@ -1097,10 +1096,8 @@ export default function App() {
         const isEdge = above !== below;
 
         if (isEdge && !inRun) {
-          try {
-            inRun = true;
-            rStart = x;
-          } catch(e){}
+          inRun = true;
+          rStart = x;
         }
         if (!isEdge && inRun) {
           segments.push({ x1: rStart, y1: y, x2: x, y2: y, horiz: true });
@@ -3705,7 +3702,7 @@ export default function App() {
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={onSetActiveLayer}
+          onSetActiveLayer={setActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
