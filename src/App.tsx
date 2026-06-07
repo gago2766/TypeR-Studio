@@ -955,7 +955,7 @@ export default function App() {
         cx > minX_limit ? pos - 1 : -1,
         cx < maxX_limit ? pos + 1 : -1,
         cy > minY_limit ? pos - imgW : -1,
-        cy < maxY_limit ? pos + imgW : -1,
+        cy < maxY_limit ? pos + imgW : -1
       ];
 
       const p_idx = pos * 4;
@@ -1043,7 +1043,8 @@ export default function App() {
         lx > 0 ? pos - 1 : -1,
         lx < localW - 1 ? pos + 1 : -1,
         ly > 0 ? pos - localW : -1,
-        ly < localH - 1 ? pos + localW : -1;
+        ly < localH - 1 ? pos + localW : -1
+      ];
 
       for (let k = 0; k < 4; k++) {
         const np = neighbors[k];
@@ -2954,7 +2955,7 @@ export default function App() {
       
       // الكشف الذكي عن خطأ الحظر الجغرافي من Google لـ Egypt / Europe
       if (errMsg.includes("Image generation is not available") || errMsg.includes("FAILED_PRECONDITION")) {
-        addToast('❌ حظر جغرافي من Google: ميزة تعديل وتوليد الصور غير متاحة في منطقتك حالياً (مثل مصر والشرق الأوسط). لتشغيلها، يرجى تفعيل أي تطبيق VPN (على دولة تدعم الخدمة كأمريكا 🇺🇸) ثم أعد المحاولة!', 'error');
+        addToast('❌ حظر جغرافي من Google: ميزة تعديل وتوليد الصور غير متاحة في منطقتك حالياً (مثل مصر والشرق الأوسط). لتشغيلها, يرجى تفعيل أي تطبيق VPN (على دولة تدعم الخدمة كأمريكا 🇺🇸) ثم أعد المحاولة!', 'error');
       } else {
         addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${errMsg}`, 'error');
       }
