@@ -13,6 +13,7 @@ export interface TextStyle {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  tagColor?: string; // 👈 ميزة لون التمييز التلقائي للوسوم
 }
 
 export interface StyleFolder {
@@ -46,7 +47,7 @@ export interface MangaLayer {
   preTatweelText?: string;
   angle?: number;
   flippedY?: boolean;
-  lineCountOverride?: number; // 👈 خيار تحديد عدد أسطر الفقاعة من 1 إلى 10 يدويًا
+  lineCountOverride?: number; // خيار تحديد عدد أسطر الفقاعة من 1 إلى 10 يدويًا
 }
 
 export interface MangaPage {
