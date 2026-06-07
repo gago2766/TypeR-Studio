@@ -84,15 +84,15 @@ const INITIAL_FOLDERS: StyleFolder[] = [
     id: "folder_dialogue",
     name: "محادثات المانجا",
     styles: [
-      { id: "style_normal", name: "عادي", fontSize: "auto", color: "#000000", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Tahoma, sans-serif", tags: ["n", "normal"], enabled: true },
-      { id: "style_thought", name: "تفكير داخلي", fontSize: "auto", color: "#444444", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Arial, sans-serif", tags: ["t", "thought"], enabled: true }
+      { id: "style_normal", name: "عادي", fontSize: "auto", color: "#000000", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Tahoma, sans-serif", tags: ["n", "normal"], enabled: true, tagColor: "#FFF3B0" },
+      { id: "style_thought", name: "تفكير داخلي", fontSize: "auto", color: "#444444", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Arial, sans-serif", tags: ["t", "thought"], enabled: true, tagColor: "#A3E4D7" }
     ]
   },
   {
     id: "folder_sfx",
     name: "المؤثرات الصوتية",
     styles: [
-      { id: "style_scream", name: "صراخ غاضب", fontSize: "auto", color: "#e81123", bgColor: "transparent", tracking: 1, lineHeight: 1.1, textAlign: "center", fontFamily: "Impact, sans-serif", tags: ["s", "scream"], enabled: true }
+      { id: "style_scream", name: "صراخ غاضب", fontSize: "auto", color: "#e81123", bgColor: "transparent", tracking: 1, lineHeight: 1.1, textAlign: "center", fontFamily: "Impact, sans-serif", tags: ["s", "scream"], enabled: true, tagColor: "#FADBD8" }
     ]
   }
 ];
@@ -265,6 +265,23 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showExportSelectorModal, setShowExportSelectorModal] = useState<boolean>(false);
   const [checkedStylesForExport, setCheckedStylesForExport] = useState<string[]>([]);
+
+  // 👈 حالات إدارة نافذة تعديل الأنماط التفاعلية الجديدة
+  const [editingStyle, setEditingStyle] = useState<{ style: TextStyle; folderId: string } | null>(null);
+  const [editFormName, setEditFormName] = useState('');
+  const [editFormFolderId, setEditFormFolderId] = useState('');
+  const [editFormFamily, setEditFormFamily] = useState('Tahoma, sans-serif');
+  const [editFormSize, setEditFormSize] = useState('auto');
+  const [editFormColor, setEditFormColor] = useState('#000000');
+  const [editFormBg, setEditFormBg] = useState('transparent');
+  const [editFormTracking, setEditFormTracking] = useState(0);
+  const [editFormLineHeight, setEditFormLineHeight] = useState(1.25);
+  const [editFormAlign, setEditFormAlign] = useState<'center' | 'left' | 'right'>('center');
+  const [editFormBold, setEditFormBold] = useState(false);
+  const [editFormItalic, setEditFormItalic] = useState(false);
+  const [editFormUnderline, setEditFormUnderline] = useState(false);
+  const [editFormTags, setEditFormTags] = useState('');
+  const [editFormTagColor, setEditFormTagColor] = useState('#FFF3B0');
 
   // قائمة إشعارات الـ Toast للتنبيهات السريعة
   const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: 'error' | 'success' }>>([]);
@@ -510,7 +527,7 @@ export default function App() {
     pushSnapshot(newLayersState, pages[currentPageIndex]?.cleaningDataUrl || '');
   };
 
-  // دالة تحديث الطبقات معدلة لاحتضان التحديث الفوري للأبعاد والخط عند تغيير عدد الأسطر يدوياً
+  // دالة تحديث الطبقات المحدثة لاحتضان تفتيت الأسطر الفوري والتلقائي بناءً على lineCountOverride المختار
   const handleUpdateLayer = (layerId: string, updates: Partial<MangaLayer>) => {
     if (currentPageIndex === -1) return;
     const previousState = [...currentLayers];
@@ -1717,35 +1734,139 @@ export default function App() {
     }
   };
 
+  // دالة إضافة نمط تنسيقي مع خيار تحديد المجلد المستهدف فوراً
   const handleAddStyle = () => {
     if (folders.length === 0) {
       addToast('أضف مجلداً تصنيفياً أولاً لتجميع هذا النمط بداخله', 'error');
       return;
     }
     const name = prompt('أدخل اسم النمط الجديد:');
-    if (name) {
-      const newStyle: TextStyle = {
-        id: `style_${Date.now()}`,
-        name,
-        fontSize: 'auto',
-        color: '#000000',
-        bgColor: 'transparent',
-        tracking: 0,
-        lineHeight: 1.25,
-        textAlign: 'center',
-        fontFamily: 'Arial, sans-serif',
-        tags: [name.toLowerCase()],
-        enabled: true,
-      };
+    if (!name) return;
 
-      setFolders(prev =>
-        prev.map((f, i) => {
-          if (i !== 0) return f;
-          return { ...f, styles: [...f.styles, newStyle] };
-        })
-      );
-      addToast(`تم تكوين النمط "${name}" وتخزينه`);
+    let targetFolderId = folders[0].id;
+
+    // تمكين خيار اختيار المجلد المستهدف عند وجود مجلدين أو أكثر
+    if (folders.length > 1) {
+      const folderListStr = folders.map((f, i) => `${i + 1}. ${f.name}`).join('\n');
+      const selection = prompt(`اختر رقم المجلد لإضافة النمط إليه:\n${folderListStr}`, "1");
+      if (selection) {
+        const idx = parseInt(selection) - 1;
+        if (idx >= 0 && idx < folders.length) {
+          targetFolderId = folders[idx].id;
+        }
+      }
     }
+
+    const newStyle: TextStyle = {
+      id: `style_${Date.now()}`,
+      name,
+      fontSize: 'auto',
+      color: '#000000',
+      bgColor: 'transparent',
+      tracking: 0,
+      lineHeight: 1.25,
+      textAlign: 'center',
+      fontFamily: 'Arial, sans-serif',
+      tags: [name.toLowerCase()],
+      enabled: true,
+      tagColor: '#FFF3B0' // تلوين افتراضي جذاب لتمييز السطر في قائمة الترجمة
+    };
+
+    setFolders(prev =>
+      prev.map(f => {
+        if (f.id !== targetFolderId) return f;
+        return { ...f, styles: [...f.styles, newStyle] };
+      })
+    );
+    addToast(`تم تكوين النمط "${name}" وتخزينه بنجاح`, 'success');
+  };
+
+  // 👈 دالة حذف المجلد النشط وكل الأنماط بداخلها
+  const handleDeleteFolder = (folderId: string) => {
+    const target = folders.find(f => f.id === folderId);
+    if (!target) return;
+    const confirmDelete = window.confirm(`هل أنت متأكد من حذف المجلد "${target.name}" وجميع الأنماط التنسيقية المندرجة بداخله؟`);
+    if (!confirmDelete) return;
+
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    addToast(`✓ تم حذف المجلد "${target.name}" بنجاح`, 'success');
+  };
+
+  // 👈 دالة حفظ وإعادة فرز النمط المعدل داخل المجلدات
+  const handleSaveEditedStyle = (updatedStyle: TextStyle, targetFolderId: string) => {
+    setFolders(prev => {
+      // إزالة النمط أولاً لتجنب التكرار
+      const cleaned = prev.map(f => ({
+        ...f,
+        styles: f.styles.filter(s => s.id !== updatedStyle.id)
+      }));
+      // إضافته للمجلد الجديد المختار
+      return cleaned.map(f => {
+        if (f.id !== targetFolderId) return f;
+        return {
+          ...f,
+          styles: [...f.styles, updatedStyle]
+        };
+      });
+    });
+    setEditingStyle(null);
+    addToast('✓ تم حفظ التعديلات على النمط بنجاح', 'success');
+  };
+
+  // 👈 دالة حذف نمط تنسيقي محدد
+  const handleDeleteStyle = (styleId: string) => {
+    const confirmDelete = window.confirm('هل أنت متأكد من حذف هذا النمط التنسيقي نهائياً؟');
+    if (!confirmDelete) return;
+
+    setFolders(prev =>
+      prev.map(f => ({
+        ...f,
+        styles: f.styles.filter(s => s.id !== styleId)
+      }))
+    );
+    if (selectedStyleId === styleId) {
+      setSelectedStyleId('style_normal');
+    }
+    setEditingStyle(null);
+    addToast('✓ تم حذف النمط التنسيقي بنجاح', 'success');
+  };
+
+  // 👈 فتح شاشة تعديل النمط وملء حقول النموذج بالقيم الحالية للنمط التنسيقي المختار
+  const handleOpenEditStyle = (style: TextStyle, folderId: string) => {
+    setEditingStyle({ style, folderId });
+    setEditFormName(style.name);
+    setEditFormFolderId(folderId);
+    setEditFormFamily(style.fontFamily);
+    setEditFormSize(style.fontSize === 'auto' ? 'auto' : `${style.fontSize}`);
+    setEditFormColor(style.color);
+    setEditFormBg(style.bgColor || 'transparent');
+    setEditFormTracking(style.tracking);
+    setEditFormLineHeight(style.lineHeight);
+    setEditFormAlign(style.textAlign);
+    setEditFormBold(!!style.bold);
+    setEditFormItalic(!!style.italic);
+    setEditFormUnderline(!!style.underline);
+    setEditFormTags(style.tags.join(' '));
+    setEditFormTagColor(style.tagColor || '#FFF3B0');
+  };
+
+  // 👈 نسخ قيم تنسيق الطبقة النشطة بمسرح العمل ومطابقتها مباشرة في النموذج التفاعلي
+  const handleCopyActiveLayerStyleToForm = () => {
+    if (!activeLayer) {
+      addToast('❌ حدد طبقة نصية نشطة في مسرح العمل أولاً لنسخ تنسيقها', 'error');
+      return;
+    }
+    setEditFormFamily(activeLayer.style.fontFamily);
+    setEditFormSize(activeLayer.style.fontSize.replace('px', '') || '16');
+    setEditFormColor(activeLayer.style.color);
+    setEditFormBg(activeLayer.style.bgColor);
+    setEditFormTracking(parseFloat(activeLayer.style.letterSpacing) || 0);
+    setEditFormLineHeight(activeLayer.style.lineHeight);
+    setEditFormAlign(activeLayer.style.textAlign);
+    setEditFormBold(activeLayer.style.fontWeight === 'bold');
+    setEditFormItalic(activeLayer.style.fontStyle === 'italic');
+    setEditFormUnderline(activeLayer.style.textDecoration === 'underline');
+    addToast('✓ تم نسخ ومطابقة تنسيق الطبقة النشطة بنجاح', 'success');
   };
 
   const handleDuplicateFolder = (folderId: string) => {
@@ -2235,7 +2356,7 @@ export default function App() {
     });
   };
 
-  // تصدير الصفحة النشطة كملف فوتوشوب متعدد الطبقات PSD
+  // تصدير الصفحة النشطة كملف فوتوشوب PSD
   const handleExportPSD = () => {
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
     if (!imgEl || !imgEl.naturalWidth || pages.length === 0) {
@@ -2307,7 +2428,7 @@ export default function App() {
     drawWatermarkToCanvas(bgCtx, bgCanvas.width, bgCanvas.height, runPSDExport);
   };
 
-  // تصدير وضغط كافة الصفحات بملف ZIP واحد مضغوط
+  // تصدير وضغط جميع الصفحات بملف ZIP واحد
   const handleExportAllZip = () => {
     if (pages.length === 0) {
       addToast('لا توجد صفحات مضافة لتصديرها كـ ZIP', 'error');
@@ -2389,7 +2510,7 @@ export default function App() {
     triggerNext();
   };
 
-  // تصدير وتحميل كافة الصفحات المترجمة منفردة
+  // تصدير جميع الصفحات منفصلة
   const handleExportAll = () => {
     if (pages.length === 0) {
       addToast('لا توجد صفحات مضافة لتصديرها', 'error');
@@ -2414,7 +2535,6 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // 👈 تم إرجاع المتغير المعرف للتصدير (exportImg) بدلاً من (imgEl) لتفادي أخطاء تجميد الواجهة والـ Compile
         ctx.drawImage(exportImg, 0, 0);
 
         const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -2578,14 +2698,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
+        } else if (b.shape === 'vertical_oval') {
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
+          b.shape,
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
@@ -3855,6 +3975,8 @@ export default function App() {
         onAIInpaint={handleAIInpaint}
         detectedBubbleType={detectedBubbleType}
         onSelectBubbleShape={handleSelectBubbleShape}
+        onDeleteFolder={handleDeleteFolder} // 👈 ربط دالة حذف المجلدات
+        onEditStyle={handleOpenEditStyle} // 👈 ربط دالة فتح شاشة التعديل
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -3866,6 +3988,248 @@ export default function App() {
         favFonts={favFonts}
         onOpenFontManager={() => setShowFontManager(true)}
       />
+
+      {/* 👈 نافذة تحرير وتعديل النمط التفاعلية الشاملة (Style Editing Modal) */}
+      {editingStyle && (
+        <div className="fixed inset-0 bg-black/80 z-[100000] flex items-center justify-center p-4 backdrop-blur-xs select-none" dir="rtl">
+          <div className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg p-5 w-full max-w-md text-right flex flex-col gap-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#2d2d2d] pb-2">
+              <span className="text-sm font-bold text-white">⚙️ تحرير وتعديل النمط التنسيقي</span>
+              <button 
+                onClick={() => setEditingStyle(null)}
+                className="text-gray-400 hover:text-white text-lg font-bold outline-none focus:outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* اسم النمط */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-gray-400">اسم النمط (Style name):</label>
+              <input
+                type="text"
+                value={editFormName}
+                onChange={e => setEditFormName(e.target.value)}
+                className="w-full bg-[#151515] border border-[#2d2d2d] text-white rounded px-2.5 py-1.5 text-xs outline-none focus:border-[#007acc]"
+              />
+            </div>
+
+            {/* المجلد المستهدف */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-gray-400">المجلد المستهدف (Folder):</label>
+              <select
+                value={editFormFolderId}
+                onChange={e => setEditFormFolderId(e.target.value)}
+                className="w-full bg-[#151515] border border-[#2d2d2d] text-white rounded px-2.5 py-1.5 text-xs outline-none cursor-pointer focus:border-[#007acc]"
+              >
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* زر نسخ قيم الطبقة النشطة بمسرح العمل */}
+            <button
+              onClick={handleCopyActiveLayerStyleToForm}
+              className="w-full bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-xs py-2 rounded transition flex items-center justify-center gap-1.5 font-bold cursor-pointer"
+            >
+              <span>❐ نسخ تنسيق الطبقة النشطة (Copy layer style)</span>
+            </button>
+
+            {/* إعدادات الخط والتنسيق */}
+            <div className="bg-[#151515] border border-[#2d2d2d] rounded p-3 flex flex-col gap-3">
+              <span className="text-[11px] text-gray-400 font-bold border-b border-[#2d2d2d] pb-1">إعدادات الخط والتنسيق (Style settings):</span>
+
+              {/* اختيار الخط */}
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-xs text-gray-400">نوع الخط:</span>
+                <select
+                  value={editFormFamily}
+                  onChange={e => setEditFormFamily(e.target.value)}
+                  className="w-48 bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs outline-none"
+                >
+                  {allFontsList.map(f => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* حجم الخط وتباعد الأسطر */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-gray-400">حجم الخط:</span>
+                  <input
+                    type="text"
+                    value={editFormSize}
+                    onChange={e => setEditFormSize(e.target.value)}
+                    placeholder="Auto أو رقم"
+                    className="bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs text-center outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-gray-400">تباعد الأسطر:</span>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={editFormLineHeight}
+                    onChange={e => setEditFormLineHeight(parseFloat(e.target.value) || 1.25)}
+                    className="bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs text-center outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* تباعد الحروف ولون النص */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-gray-400">تباعد الحروف:</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editFormTracking}
+                    onChange={e => setEditFormTracking(parseFloat(e.target.value) || 0)}
+                    className="bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs text-center outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-gray-400">لون النص:</span>
+                  <input
+                    type="color"
+                    value={editFormColor}
+                    onChange={e => setEditFormColor(e.target.value)}
+                    className="w-full h-7 bg-transparent rounded cursor-pointer border-0 p-0"
+                  />
+                </div>
+              </div>
+
+              {/* أزرار تنسيق الخط والمحاذاة */}
+              <div className="grid grid-cols-2 gap-2 border-t border-[#2d2d2d] pt-2">
+                <div className="flex gap-1 justify-center">
+                  <button
+                    onClick={() => setEditFormBold(!editFormBold)}
+                    className={`flex-1 py-1 text-xs font-bold rounded transition ${
+                      editFormBold ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    B
+                  </button>
+                  <button
+                    onClick={() => setEditFormItalic(!editFormItalic)}
+                    className={`flex-1 py-1 text-xs italic rounded transition ${
+                      editFormItalic ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    I
+                  </button>
+                  <button
+                    onClick={() => setEditFormUnderline(!editFormUnderline)}
+                    className={`flex-1 py-1 text-xs underline rounded transition ${
+                      editFormUnderline ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    U
+                  </button>
+                </div>
+
+                <div className="flex gap-1 justify-center">
+                  <button
+                    onClick={() => setEditFormAlign('right')}
+                    className={`flex-1 py-1 text-xs rounded transition ${
+                      editFormAlign === 'right' ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-300'
+                    }`}
+                    title="يمين"
+                  >
+                    ⇤
+                  </button>
+                  <button
+                    onClick={() => setEditFormAlign('center')}
+                    className={`flex-1 py-1 text-xs rounded transition ${
+                      editFormAlign === 'center' ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-300'
+                    }`}
+                    title="وسط"
+                  >
+                    ≡
+                  </button>
+                  <button
+                    onClick={() => setEditFormAlign('left')}
+                    className={`flex-1 py-1 text-xs rounded transition ${
+                      editFormAlign === 'left' ? 'bg-[#007acc] text-white' : 'bg-[#2d2d2d] text-gray-300'
+                    }`}
+                    title="يسار"
+                  >
+                    ⇥
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* علامات الاختيار التلقائي */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-gray-400 font-bold">علامات الاختيار التلقائي (Tags for automatic style choosing):</label>
+              <input
+                type="text"
+                value={editFormTags}
+                onChange={e => setEditFormTags(e.target.value)}
+                placeholder="مثال: scream shout s"
+                className="w-full bg-[#151515] border border-[#2d2d2d] text-white rounded px-2.5 py-1.5 text-xs outline-none focus:border-[#007acc]"
+              />
+              <p className="text-[10px] text-gray-500 leading-normal">
+                (اختياري) حدد وسوم الأسطر مفصولة بمسافة. إذا بدأ السطر في النص المترجم بإحدى هذه العلامات، فسيتم تنشيط هذا النمط التنسيقي تلقائياً عند تحديد السطر.
+              </p>
+            </div>
+
+            {/* لون التمييز التلقائي للوسوم */}
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-xs text-gray-400 font-bold">لون التمييز التلقائي (Tag color):</span>
+              <input
+                type="color"
+                value={editFormTagColor}
+                onChange={e => setEditFormTagColor(e.target.value)}
+                className="w-24 h-7 bg-transparent rounded cursor-pointer border-0 p-0"
+              />
+            </div>
+
+            {/* أزرار الحفظ والحذف */}
+            <div className="flex gap-2 justify-between border-t border-[#2d2d2d] pt-3">
+              <button
+                onClick={() => {
+                  if (!editFormName.trim()) {
+                    addToast('⚠️ يرجى إدخال اسم للنمط أولاً', 'error');
+                    return;
+                  }
+                  const isSzAuto = editFormSize.trim().toLowerCase() === 'auto';
+                  const formattedStyle: TextStyle = {
+                    id: editingStyle.style.id,
+                    name: editFormName,
+                    fontSize: isSzAuto ? 'auto' : (parseFloat(editFormSize) || 16),
+                    color: editFormColor,
+                    bgColor: editFormBg,
+                    tracking: editFormTracking,
+                    lineHeight: editFormLineHeight,
+                    textAlign: editFormAlign,
+                    fontFamily: editFormFamily,
+                    tags: editFormTags.split(' ').map(t => t.trim()).filter(Boolean),
+                    enabled: editingStyle.style.enabled,
+                    bold: editFormBold,
+                    italic: editFormItalic,
+                    underline: editFormUnderline,
+                    tagColor: editFormTagColor
+                  };
+                  handleSaveEditedStyle(formattedStyle, editFormFolderId);
+                }}
+                className="bg-[#007acc] text-white hover:bg-[#0062a3] py-2 px-5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <span>💾 حفظ التغييرات</span>
+              </button>
+              <button
+                onClick={() => handleDeleteStyle(editingStyle.style.id)}
+                className="bg-red-950/80 border border-red-900/60 hover:bg-red-800 text-red-300 py-2 px-4 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <span>🗑️ حذف النمط</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );
