@@ -884,7 +884,7 @@ export default function App() {
     }
   };
 
-// خوارزمية العصا السحرية لتحديد حواف وهيكل الفقاعات آلياً باستخدام طريقة Ray-Casting الذكية والمقاومة للثغرات والفراغات والفقاعات الداكنة والملونة
+  // خوارزمية العصا السحرية لتحديد حواف وهيكل الفقاعات آلياً
   const handleWandSelect = (clickX: number, clickY: number) => {
     const img = document.getElementById('manga-img') as HTMLImageElement;
     if (!img || !img.naturalWidth) {
@@ -913,164 +913,171 @@ export default function App() {
 
     const si = (py * imgW + px) * 4;
     const sA = data[si + 3];
-    if (sA < 150) {
-      addToast('⚠️ اضغط داخل الفقاعة الملونة وليس خارج الصورة', 'error');
+    if (sA < 30) {
+      addToast('⚠️ اضغط داخل الفقاعة وليس على مساحة فارغة', 'error');
       return;
     }
-    
     const sR = data[si], sG = data[si + 1], sB = data[si + 2];
-    const sL = 0.299 * sR + 0.587 * sG + 0.114 * sB; // حساب شدة السطوع للخلية المحددة
 
-    const numRays = 180; // 180 شعاعاً بزاوية 2 درجة لكل شعاع لتغطية كاملة بدقة عالية
-    const rayLengths = new Float32Array(numRays);
-    const maxDist = Math.round(Math.sqrt(imgW * imgW + imgH * imgH));
-
-    // 1. إطلاق الأشعة في جميع الاتجاهات الدائرية لقياس المسافات حتى حدود الفقاعة
-    for (let i = 0; i < numRays; i++) {
-      const angle = (i * 2 * Math.PI) / numRays;
-      const cosA = Math.cos(angle);
-      const sinA = Math.sin(angle);
-      
-      let d = 1;
-      let hit = false;
-      while (d < maxDist) {
-        const rx = Math.round(px + d * cosA);
-        const ry = Math.round(py + d * sinA);
-        
-        if (rx < 0 || rx >= imgW || ry < 0 || ry >= imgH) {
-          d = Math.max(1, d - 1);
-          break;
-        }
-        
-        const idx = (ry * imgW + rx) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const a = data[idx + 3];
-        const L = 0.299 * r + 0.587 * g + 0.114 * b;
-        
-        // شرط الإيقاف الذكي والمعدل للتكيف التلقائي مع الفقاعات الفاتحة، والداكنة، والملونة
-        if (sL > 120) {
-          // الفقاعات الفاتحة أو الملونة: التوقف عند ملامسة لون داكن (حدود الفقاعة) أو انخفاض حاد بالسطوع
-          if (L < 100 || L < sL - 45 || a < 100) {
-            hit = true;
-            break;
-          }
-        } else {
-          // الفقاعات الداكنة أو السوداء: التوقف عند ملامسة لون فاتح (الحدود أو الخلفية المجاورة)
-          if (L > 140 || L > sL + 45 || a < 100) {
-            hit = true;
-            break;
-          }
-        }
-        
-        d++;
-      }
-      rayLengths[i] = d;
-    }
-
-    // 2. تنقية وتنعيم الأشعة باستخدام مرشح الوسيط (Median Filter) على مرحلتين لإلغاء التشويش (كالنصوص الداخلية والفراغات الجانبية)
-    const smoothLengths = new Float32Array(numRays);
-    const windowSize = 21; // فحص 21 اتجاهاً مجاوراً لتحديد وتعديل أي شعاع شاذ
-    const halfWin = Math.floor(windowSize / 2);
-
-    for (let i = 0; i < numRays; i++) {
-      const neighbors: number[] = [];
-      for (let w = -halfWin; w <= halfWin; w++) {
-        const idx = (i + w + numRays) % numRays;
-        neighbors.push(rayLengths[idx]);
-      }
-      neighbors.sort((a, b) => a - b);
-      const median = neighbors[Math.floor(neighbors.length / 2)];
-      
-      const current = rayLengths[i];
-      // معالجة الانحرافات الشاذة الناتجة عن تسرب الأشعة عبر الفراغات أو اصطدامها بالحروف داخل الفقاعة
-      if (current < median * 0.65 || current > median * 1.35) {
-        smoothLengths[i] = median;
-      } else {
-        smoothLengths[i] = current;
-      }
-    }
-
-    const finalLengths = new Float32Array(numRays);
-    for (let i = 0; i < numRays; i++) {
-      const neighbors: number[] = [];
-      for (let w = -5; w <= 5; w++) {
-        const idx = (i + w + numRays) % numRays;
-        neighbors.push(smoothLengths[idx]);
-      }
-      neighbors.sort((a, b) => a - b);
-      finalLengths[i] = neighbors[Math.floor(neighbors.length / 2)];
-    }
-
-    // 3. رسم المضلع المغلق الناتج وملئه للحصول على القناع (Mask) بدقة متكاملة وبدون أي تسريب
+    const tolerance = wandTolerance;
     const mask = new Uint8Array(imgW * imgH);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = imgW;
-    tempCanvas.height = imgH;
-    const tctx = tempCanvas.getContext('2d');
-    if (tctx) {
-      tctx.fillStyle = '#000000';
-      tctx.fillRect(0, 0, imgW, imgH);
-      tctx.fillStyle = '#ffffff';
-      tctx.beginPath();
-      
-      for (let i = 0; i < numRays; i++) {
-        const angle = (i * 2 * Math.PI) / numRays;
-        const rx = px + finalLengths[i] * Math.cos(angle);
-        const ry = py + finalLengths[i] * Math.sin(angle);
-        if (i === 0) {
-          tctx.moveTo(rx, ry);
-        } else {
-          tctx.lineTo(rx, ry);
-        }
-      }
-      tctx.closePath();
-      tctx.fill();
-      
-      const tImgData = tctx.getImageData(0, 0, imgW, imgH);
-      const tData = tImgData.data;
-      for (let y = 0; y < imgH; y++) {
-        const row = y * imgW;
-        for (let x = 0; x < imgW; x++) {
-          if (tData[(row + x) * 4] > 127) {
-            mask[row + x] = 1;
-          }
+
+    // حدد نطاق البحث المحلي حول نقطة النقرة لمنع تسريب التحديد لكامل الصفحة البيضاء
+    const searchRangeX = Math.max(150, Math.floor(imgW * 0.35));
+    const searchRangeY = Math.max(150, Math.floor(imgH * 0.35));
+    const minX_limit = Math.max(0, px - searchRangeX);
+    const maxX_limit = Math.min(imgW - 1, px + searchRangeX);
+    const minY_limit = Math.max(0, py - searchRangeY);
+    const maxY_limit = Math.min(imgH - 1, py + searchRangeY);
+
+    let minX = px, maxX = px, minY = py, maxY = py;
+    const queue = new Int32Array(imgW * imgH);
+    let head = 0, tail = 0;
+
+    queue[tail++] = py * imgW + px;
+    mask[py * imgW + px] = 1;
+
+    while (head < tail) {
+      const pos = queue[head++];
+      const cx = pos % imgW;
+      const cy = Math.floor(pos / imgW);
+
+      if (cx < minX) minX = cx;
+      if (cx > maxX) maxX = cx;
+      if (cy < minY) minY = cy;
+      if (cy > maxY) maxY = cy;
+
+      const neighbors = [
+        cx > minX_limit ? pos - 1 : -1,
+        cx < maxX_limit ? pos + 1 : -1,
+        cy > minY_limit ? pos - imgW : -1,
+        cy < maxY_limit ? pos + imgW : -1,
+      ];
+
+      const p_idx = pos * 4;
+      const pR = data[p_idx];
+      const pG = data[p_idx + 1];
+      const pB = data[p_idx + 2];
+
+      for (let k = 0; k < 4; k++) {
+        const np = neighbors[k];
+        if (np < 0 || mask[np]) continue;
+        const ni = np * 4;
+        if (data[ni + 3] < 30) continue;
+
+        const dr = data[ni] - sR;
+        const dg = data[ni+1] - sG;
+        const db = data[ni+2] - sB;
+        const distToSeed = Math.sqrt(dr*dr + dg*dg + db*db);
+
+        const dpr = data[ni] - pR;
+        const dpg = data[ni+1] - pG;
+        const dpb = data[ni+2] - pB;
+        const distToParent = Math.sqrt(dpr*dpr + dpg*dpg + dpb*dpb);
+
+        if (distToSeed <= tolerance || (distToParent <= tolerance * 0.45 && distToSeed <= tolerance * 3.5)) {
+          mask[np] = 1;
+          queue[tail++] = np;
         }
       }
     }
 
-    // حساب صندوق الإحاطة (Bounding Box) الفعلي والآمن للمساحة المحددة
-    let minX = imgW, maxX = 0, minY = imgH, maxY = 0;
-    let hasPixels = false;
-    for (let y = 0; y < imgH; y++) {
-      const row = y * imgW;
-      for (let x = 0; x < imgW; x++) {
-        if (mask[row + x] === 1) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-          hasPixels = true;
+    // 💾 خوارزمية سد الفراغات والثقوب بالفقاعة لضمان دقة القناع
+    const localW = maxX - minX + 3;
+    const localH = maxY - minY + 3;
+    const localVisited = new Uint8Array(localW * localH);
+    const localQueue = new Int32Array(localW * localH);
+    let lHead = 0, lTail = 0;
+
+    const isMaskSet = (gx: number, gy: number): boolean => {
+      if (gx < 0 || gx >= imgW || gy < 0 || gy >= imgH) return false;
+      return mask[gy * imgW + gx] === 1;
+    };
+
+    for (let lx = 0; lx < localW; lx++) {
+      const gx = minX - 1 + lx;
+      const gyTop = minY - 1;
+      const idxTop = 0 * localW + lx;
+      if (!isMaskSet(gx, gyTop)) {
+        localVisited[idxTop] = 1;
+        localQueue[lTail++] = idxTop;
+      }
+      const gyBottom = maxY + 1;
+      const idxBottom = (localH - 1) * localW + lx;
+      if (!isMaskSet(gx, gyBottom)) {
+        localVisited[idxBottom] = 1;
+        localQueue[lTail++] = idxBottom;
+      }
+    }
+
+    for (let ly = 0; ly < localH; ly++) {
+      const gy = minY - 1 + ly;
+      const gxLeft = minX - 1;
+      const idxLeft = ly * localW + 0;
+      if (!isMaskSet(gxLeft, gy)) {
+        if (localVisited[idxLeft] === 0) {
+          localVisited[idxLeft] = 1;
+          localQueue[lTail++] = idxLeft;
+        }
+      }
+      const gxRight = maxX + 1;
+      const idxRight = ly * localW + (localW - 1);
+      if (!isMaskSet(gxRight, gy)) {
+        if (localVisited[idxRight] === 0) {
+          localVisited[idxRight] = 1;
+          localQueue[lTail++] = idxRight;
         }
       }
     }
-    if (!hasPixels) {
-      minX = px;
-      maxX = px;
-      minY = py;
-      maxY = py;
+
+    while (lHead < lTail) {
+      const pos = localQueue[lHead++];
+      const lx = pos % localW;
+      const ly = Math.floor(pos / localW);
+
+      const neighbors = [
+        lx > 0 ? pos - 1 : -1,
+        lx < localW - 1 ? pos + 1 : -1,
+        ly > 0 ? pos - localW : -1,
+        ly < localH - 1 ? pos + localW : -1,
+      ];
+
+      for (let k = 0; k < 4; k++) {
+        const np = neighbors[k];
+        if (np < 0 || localVisited[np] === 1) continue;
+        const nlx = np % localW;
+        const nly = Math.floor(np / localW);
+        const gx = minX - 1 + nlx;
+        const gy = minY - 1 + nly;
+
+        if (!isMaskSet(gx, gy)) {
+          localVisited[np] = 1;
+          localQueue[lTail++] = np;
+        }
+      }
+    }
+
+    for (let ly = 1; ly < localH - 1; ly++) {
+      const gy = minY - 1 + ly;
+      if (gy < 0 || gy >= imgH) continue;
+      for (let lx = 1; lx < localW - 1; lx++) {
+        const gx = minX - 1 + lx;
+        if (gx < 0 || gx >= imgW) continue;
+        const idx = ly * localW + lx;
+        if (localVisited[idx] === 0 && mask[gy * imgW + gx] === 0) {
+          mask[gy * imgW + gx] = 1;
+        }
+      }
     }
 
     const foundW = maxX - minX + 1;
     const foundH = maxY - minY + 1;
 
     if (foundW < minBubbleSize || foundH < minBubbleSize) {
-      addToast('⚠️ لم تكتشف فقاعة متكاملة. جرب الضغط في منتصف بياض أو سواد الفقاعة', 'error');
+      addToast('⚠️ لم تكتشف فقاعة متكاملة. جرب الضغط في منتصف بياض الفقاعة', 'error');
       return;
     }
 
-    // استخراج حواف الإطار الخارجي لرسم الخطوط المتحركة
     const segments: typeof edgeSegments = [];
     const borderX0 = Math.max(0, minX - 1);
     const borderX1 = Math.min(imgW - 1, maxX + 1);
@@ -1133,7 +1140,7 @@ export default function App() {
     }
 
     const aspect = foundW / foundH;
-    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval';
+    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval'; // 👈 تغيير circular لـ vertical_oval
     if (activePixels > 0) {
       const centerX = sumX / activePixels;
       const centerY = sumY / activePixels;
@@ -1164,8 +1171,8 @@ export default function App() {
         bType = 'spiky_shout';
       } else if (shapeCV > 0.082 && segments.length / Math.sqrt(bboxArea) > 3.0) {
         bType = 'thought_cloud';
-      } else if (aspect >= 0.5 && aspect <= 1.45) {
-        bType = 'vertical_oval';
+      } else if (aspect >= 0.5 && aspect <= 1.45) { // 👈 تمكين الكشف والتمييز التلقائي ليكون أكثر دقة للفقاعة الدائرية والعمودية الطويلة معاً
+        bType = 'vertical_oval'; // 👈 التبديل لنمط بيضاوية رأسية
       } else {
         bType = 'normal_oval';
       }
@@ -1183,6 +1190,7 @@ export default function App() {
       h: foundH,
     });
 
+    // 👈 ربط وتحديث الطبقة النصية النشطة المحددة فوراً عند التحديد بالعصا السحرية لتبسيط العمل وتوزيع الحروف تلقائياً
     if (activeLayer && !multiBubbleMode) {
       const previousLayers = [...currentLayers];
       
@@ -1200,6 +1208,7 @@ export default function App() {
       const layerHeight = Math.max(20, targetH - padY * 2);
 
       const opt = calculateOptimalFontSizeForShape(
+        // إزالة فواصل الأسطر لتوزيع الكلمات ديناميكياً بدقة
         activeLayer.text.replace(/\n/g, ' '),
         bType,
         layerWidth,
@@ -1238,7 +1247,10 @@ export default function App() {
         mask: mask,
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
+      // تم تعطيل المسح الفوري ليبقى شريط الأدوات والتحديد نشطاً فوق آخر فقاعة مضافة لتسهيل الحركة
+      // clearWandSelection();
     } else {
+      // إظهار التنبيه فقط في حال عدم وجود طبقة نشطة يتم تحديثها تلقائياً
       if (!activeLayer) {
         addToast('✓ تم تحديد الفقاعة نجاحاً بالعصا');
       }
@@ -3539,7 +3551,7 @@ export default function App() {
             <div className="flex gap-2 justify-end mt-2">
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="bg-[#007acc] text-white py-1 px-5 rounded text-xs font-bold transition hover:bg-[#0062a3]"
+                className="bg-[#007acc] text-white py-1 px-5 rounded-lg text-xs font-bold transition hover:bg-[#0062a3]"
               >
                 تطبيق وإغلاق
               </button>
@@ -3624,13 +3636,13 @@ export default function App() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowSettingsModal(true)}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-2.5 rounded transition cursor-pointer"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-2.5 rounded-lg transition cursor-pointer"
             >
               ⚙ الإعدادات
             </button>
             <button
               onClick={() => setCompactMode(!compactMode)}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-2.5 rounded transition"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-2.5 rounded-lg transition"
             >
               ⇔ {compactMode ? 'طبيعي' : 'مدمج'}
             </button>
@@ -3687,7 +3699,7 @@ export default function App() {
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={setActiveLayer}
+          onSetActiveLayer={onSetActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
