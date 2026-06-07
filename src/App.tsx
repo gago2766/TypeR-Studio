@@ -510,6 +510,7 @@ export default function App() {
     pushSnapshot(newLayersState, pages[currentPageIndex]?.cleaningDataUrl || '');
   };
 
+  // دالة تحديث الطبقات معدلة لاحتضان التحديث الفوري للأبعاد والخط عند تغيير عدد الأسطر يدوياً
   const handleUpdateLayer = (layerId: string, updates: Partial<MangaLayer>) => {
     if (currentPageIndex === -1) return;
     const previousState = [...currentLayers];
@@ -521,11 +522,44 @@ export default function App() {
           ...page,
           layers: page.layers.map(l => {
             if (l.id !== layerId) return l;
-            const updated = { ...l, ...updates };
-            if (activeLayer?.id === layerId) {
-              setActiveLayer(updated);
+            
+            // تهيئة الكائن بعد دمج التعديلات
+            let updatedLayer = { ...l, ...updates };
+            
+            // في حال تم تغيير خيار عدد الأسطر يدوياً، نعيد حساب التفاف السطور وحجم الخط فوراً
+            if ('lineCountOverride' in updates && activeTool !== 'brush' && activeTool !== 'eraser' && activeTool !== 'clone_stamp') {
+              const img = document.getElementById('manga-img') as HTMLImageElement;
+              if (img && img.naturalWidth) {
+                const layerWidth = parseFloat(updatedLayer.width) || 120;
+                const layerHeight = parseFloat(updatedLayer.height) || 80;
+                
+                // تحديد شكل الفقاعة الحالية
+                const shape = detectedBubbleType || 'normal_oval';
+                
+                const opt = calculateOptimalFontSizeForShape(
+                  updatedLayer.text.replace(/\n/g, ' '),
+                  shape,
+                  layerWidth,
+                  layerHeight,
+                  updatedLayer.style.fontFamily,
+                  updatedLayer.style.lineHeight,
+                  parseFloat(updatedLayer.style.letterSpacing) || 0,
+                  bubbleMargin,
+                  updates.lineCountOverride // التمرير المباشر للقيمة الجديدة
+                );
+                
+                updatedLayer.text = opt.textWithBreaks;
+                updatedLayer.style = {
+                  ...updatedLayer.style,
+                  fontSize: `${opt.fontSize}px`
+                };
+              }
             }
-            return updated;
+
+            if (activeLayer?.id === layerId) {
+              setActiveLayer(updatedLayer);
+            }
+            return updatedLayer;
           }),
         };
       })
@@ -1220,7 +1254,8 @@ export default function App() {
         activeLayer.style.fontFamily,
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
-        bubbleMargin
+        bubbleMargin,
+        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
       );
 
       handleUpdateLayer(activeLayer.id, {
@@ -1501,7 +1536,7 @@ export default function App() {
     // إذا كانت المحاذاة داخل العصا السحرية، نوزع النص ديناميكياً ليطابق شكل الفقاعة تماماً
     if (isWandAlign && detectedBubbleType) {
       const opt = calculateOptimalFontSizeForShape(
-        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة
+        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة التلقائية
         activeLayer.text.replace(/\n/g, ' '),
         detectedBubbleType,
         layerWidth,
@@ -1509,7 +1544,8 @@ export default function App() {
         activeLayer.style.fontFamily,
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
-        bubbleMargin
+        bubbleMargin,
+        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
       );
       optSize = opt.fontSize;
       newText = opt.textWithBreaks;
@@ -1542,7 +1578,7 @@ export default function App() {
     addToast('تمت محاذاة وتوسيط النص داخل الفقاعة المحددة بنجاح 🎉', 'success');
   };
 
-  // تطبيق الكشيدة والتمطيط العربي
+  // تطبيق الكشيدة والتمطيط العربي؛ التمطيط فقط على السطر الأول والأخير
   const handleApplyTatweel = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتطبيق التنسيق', 'error');
@@ -1566,10 +1602,15 @@ export default function App() {
     const maxW = Math.max(...widths);
     const targetW = maxW * (1 - tatweelMargin / 100);
 
-    const stretched = lines.map(line => {
+    const stretched = lines.map((line, idx) => {
       const w = ctx.measureText(line).width;
       if (w >= targetW * 0.95) return line;
-      return tatweelLine(line, targetW, ctx, fontSz, activeLayer.style.fontFamily, tatweelStrength);
+      
+      // 👈 تم تعديل دالة التمطيط يدوياً لتلتزم بالتمطيط للسطر الأول والأخير فقط
+      if (idx === 0 || idx === lines.length - 1) {
+        return tatweelLine(line, targetW, ctx, fontSz, activeLayer.style.fontFamily, tatweelStrength);
+      }
+      return line;
     });
 
     const previousLayers = [...currentLayers];
@@ -2955,7 +2996,7 @@ export default function App() {
       
       // الكشف الذكي عن خطأ الحظر الجغرافي من Google لـ Egypt / Europe
       if (errMsg.includes("Image generation is not available") || errMsg.includes("FAILED_PRECONDITION")) {
-        addToast('❌ حظر جغرافي من Google: ميزة تعديل وتوليد الصور غير متاحة في منطقتك حالياً (مثل مصر والشرق الأوسط). لتشغيلها, يرجى تفعيل أي تطبيق VPN (على دولة تدعم الخدمة كأمريكا 🇺🇸) ثم أعد المحاولة!', 'error');
+        addToast('❌ حظر جغرافي من Google: ميزة تعديل وتوليد الصور غير متاحة في منطقتك حالياً (مثل مصر والشرق الأوسط). لتشغيلها، يرجى تفعيل أي تطبيق VPN (على دولة تدعم الخدمة كأمريكا 🇺🇸) ثم أعد المحاولة!', 'error');
       } else {
         addToast(`❌ خطأ أثناء معالجة الذكاء الاصطناعي: ${errMsg}`, 'error');
       }
@@ -2989,7 +3030,8 @@ export default function App() {
         activeLayer.style.fontFamily,
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
-        bubbleMargin
+        bubbleMargin,
+        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة النشطة
       );
 
       handleUpdateLayer(activeLayer.id, {
