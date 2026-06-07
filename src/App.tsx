@@ -131,9 +131,13 @@ export default function App() {
   const [compactMode, setCompactMode] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
-  // 🔑 مفتاح Gemini API المحفوظ محلياً وبشكل آمن تماماً على الهاتف
+  // 🔑 مفتاح Gemini API المحفوظ محلياً وبشكل آمن تماماً على الهاتف مع معالجة الأخطاء
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
-    return localStorage.getItem('typer_gemini_api_key') || '';
+    try {
+      return localStorage.getItem('typer_gemini_api_key') || '';
+    } catch (e) {
+      return '';
+    }
   });
 
   useEffect(() => {
@@ -1093,8 +1097,10 @@ export default function App() {
         const isEdge = above !== below;
 
         if (isEdge && !inRun) {
-          inRun = true;
-          rStart = x;
+          try {
+            inRun = true;
+            rStart = x;
+          } catch(e){}
         }
         if (!isEdge && inRun) {
           segments.push({ x1: rStart, y1: y, x2: x, y2: y, horiz: true });
@@ -3746,7 +3752,7 @@ export default function App() {
         setScriptInput={setScriptInput}
         parsedLines={parsedLines}
         currentLineIndex={currentLineIndex}
-        onSelectLine={handleSelectLine} // 👈 تم تعديل الخطأ المطبعي البرمجي هنا بنجاح وتفادي الشاشة البيضاء تماماً
+        onSelectLine={handleSelectLine}
         folders={folders}
         setFolders={setFolders}
         selectedStyleId={selectedStyleId}
@@ -3806,9 +3812,9 @@ export default function App() {
         canDrawingRedo={!!(history[currentPageIndex]?.redo && history[currentPageIndex].redo.length > 0)}
         onWhitenWandSelection={handleWhitenWandSelection}
         hasWandMask={wandMask !== null}
-        onAIInpaint={handleAIInpaint} // 👈 ربط الدالة بالـ Sidebar الجديد بشكل مباشر وسليم
-        detectedBubbleType={detectedBubbleType} // 👈 تمرير الخصيصة المضافة حديثاً لمنع الأخطاء البرمجية
-        onSelectBubbleShape={handleSelectBubbleShape} // 👈 تمرير الدالة المضافة حديثاً لمنع الأخطاء البرمجية
+        onAIInpaint={handleAIInpaint}
+        detectedBubbleType={detectedBubbleType}
+        onSelectBubbleShape={handleSelectBubbleShape}
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
