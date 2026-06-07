@@ -44,7 +44,7 @@ export function FloatingToolbar({
       }
 
       let left = rect.left;
-      const toolbarWidth = 480; // approximate width
+      const toolbarWidth = 540; // approximate width (adjusted slightly for the new control)
       if (left + toolbarWidth > window.innerWidth) {
         left = window.innerWidth - toolbarWidth - 10;
       }
@@ -133,6 +133,22 @@ export function FloatingToolbar({
         ★
       </button>
 
+      {/* متحكم جديد لتحديد عدد أسطر الفقاعة من 1 إلى 10 */}
+      <span className="text-[10px] text-gray-400 font-medium px-1">أسطر</span>
+      <select
+        value={activeLayer.lineCountOverride || ""}
+        onChange={e => {
+          const val = e.target.value ? parseInt(e.target.value) : undefined;
+          onUpdateLayer(activeLayer.id, { lineCountOverride: val });
+        }}
+        className="bg-[#2a2a2a] border border-[#444] text-white rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-[#007acc]"
+      >
+        <option value="">تلقائي</option>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+          <option key={n} value={n}>{n}</option>
+        ))}
+      </select>
+
       <span className="text-[10px] text-gray-400 font-medium px-0.5">لون</span>
       <input
         type="color"
@@ -220,4 +236,3 @@ export function FloatingToolbar({
     </div>
   );
 }
-
