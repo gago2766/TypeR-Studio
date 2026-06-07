@@ -103,14 +103,18 @@ interface SidebarProps {
   onAIInpaint?: () => void;
 
   // 📐 إضافة ميزات التحكم وتحديد شكل الفقاعة يدوياً وتلقائياً لمطابقة صورك بدقة
-  detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null; // 👈 بيضاوية رأسية vertical_oval
-  onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval') => void; // 👈 بيضاوية رأسية vertical_oval
+  detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null;
+  onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval') => void;
 
   // Bottom action triggers
   onPrevLine: () => void;
   onNextLine: () => void;
   onInsertText: () => void;
   onAlignText: () => void;
+
+  // 👈 سنقوم باستقبال البروبات المضافة هنا لحذف المجلدات وتحرير الأنماط يدوياً
+  onDeleteFolder?: (folderId: string) => void;
+  onEditStyle?: (style: TextStyle, folderId: string) => void;
 }
 
 export function Sidebar({
@@ -121,7 +125,7 @@ export function Sidebar({
   onExportAllZip,
   onSaveState,
   onLoadState,
-  onShare, // 👈 استدعاء الدالة من الخواص المفككة
+  onShare,
   activeTool,
   setActiveTool,
   wandTolerance,
@@ -198,8 +202,11 @@ export function Sidebar({
   onWhitenWandSelection,
   hasWandMask = false,
   onAIInpaint,
-  detectedBubbleType, // 👈 فك حزمة المتغير الجديد المضاف
-  onSelectBubbleShape, // 👈 فك حزمة الدالة الجديدة المضافة
+  detectedBubbleType,
+  onSelectBubbleShape,
+  // 👈 فك حزمة المتغيرات البرمجية المضافة حديثاً
+  onDeleteFolder,
+  onEditStyle,
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -362,7 +369,6 @@ export function Sidebar({
               ? '✋ أداة اليد: انقر واسحب للتنقل بحرية كاملة داخل الصفحة عند التكبير.'
               : '🖌️ أداة تنظيف نشطة: استخدم شريط التبييض أدناه للرسم أو الختم.'}
           </div>
-
         </div>
 
         {/* Zoom & Pan Navigation Tools */}
@@ -610,7 +616,7 @@ export function Sidebar({
           </h3>
           <div
             id="lines-container"
-            className="border border-[#2d2d2d] bg-[#151515] rounded max-h-[140px] overflow-y-auto"
+            className="border border-[#2d2d2d] bg-[#151515] rounded max-h-[140px] overflow-y-auto pr-0.5"
           >
             {parsedLines.length === 0 ? (
               <div className="p-4 text-center text-gray-600 text-[10px]">
@@ -619,10 +625,22 @@ export function Sidebar({
             ) : (
               parsedLines.map((line, idx) => {
                 const isActive = idx === currentLineIndex;
+
+                // البحث عن النمط المطابق للوسم الحالي لتلوين السطر باللون المختار
+                let lineStyle: TextStyle | null = null;
+                folders.forEach(f => {
+                  if (!lineStyle) {
+                    lineStyle = f.styles.find(s => s.tags.includes(line.styleKey) && s.enabled) || null;
+                  }
+                });
+
                 return (
                   <div
                     key={idx}
                     onClick={() => onSelectLine(idx)}
+                    style={{
+                      borderRight: lineStyle?.tagColor ? `4px solid ${lineStyle.tagColor}` : undefined
+                    }}
                     className={`flex items-center justify-between py-1.5 px-2.5 text-[11px] border-b border-[#222] cursor-pointer selection:bg-transparent ${
                       isActive ? 'bg-[#094771] text-white font-medium' : 'text-gray-300 hover:bg-[#252525]'
                     } ${line.isIgnored ? 'text-gray-600 line-through bg-[#0e0e0e]/50' : ''}`}
@@ -660,16 +678,27 @@ export function Sidebar({
                     <div className="flex gap-1">
                       <button
                         onClick={() => onDuplicateFolder(folder.id)}
-                        className="text-[9px] bg-[#333] hover:bg-[#44] hover:text-white text-gray-300 py-0.5 px-1.5 rounded transition"
+                        className="text-[9px] bg-[#333] hover:bg-[#444] hover:text-white text-gray-300 py-0.5 px-1.5 rounded transition"
                       >
                         تكرار ❐
                       </button>
                       <button
                         onClick={() => onExportFolder(folder.id)}
-                        className="text-[9px] bg-[#333] hover:bg-[#44] hover:text-white text-gray-300 py-0.5 px-1.5 rounded transition"
+                        className="text-[9px] bg-[#333] hover:bg-[#444] hover:text-white text-gray-300 py-0.5 px-1.5 rounded transition"
                       >
                         تصدير 📤
                       </button>
+                      
+                      {/* 👈 زر حذف المجلد المخصص */}
+                      {onDeleteFolder && (
+                        <button
+                          onClick={() => onDeleteFolder(folder.id)}
+                          className="text-[9px] bg-red-950/80 border border-red-900/60 hover:bg-red-800 text-red-300 py-0.5 px-1.5 rounded transition cursor-pointer"
+                          title="حذف هذا المجلد وكل محتوياته"
+                        >
+                          حذف 🗑️
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="p-1 flex flex-col gap-0.5">
@@ -684,22 +713,39 @@ export function Sidebar({
                             isSelected ? 'bg-[#007acc] text-white' : 'text-gray-300 hover:bg-[#2a2a2a]'
                           } ${!isStyleEnabled ? 'opacity-40' : ''}`}
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <button
                               onClick={e => toggleStyleEnabled(folder.id, style.id, e)}
-                              className="text-gray-400 hover:text-white p-0.5 leading-none bg-none border-0 cursor-pointer text-xs"
+                              className="text-gray-400 hover:text-white p-0.5 leading-none bg-none border-0 cursor-pointer text-xs shrink-0"
                             >
-                              {isStyleEnabled ? '👁' : '👁‍🗨'}
+                              {isStyleEnabled ? '👁' : '👁‍عون'}
                             </button>
                             <span
-                              className="w-2.5 h-2.5 rounded-full inline-block border border-[#555]"
+                              className="w-2.5 h-2.5 rounded-full inline-block border border-[#555] shrink-0"
                               style={{ backgroundColor: style.color }}
                             />
-                            <span className="truncate max-w-[120px]">{style.name}</span>
+                            <span className="truncate flex-1 text-right">{style.name}</span>
                           </div>
-                          <span className="text-[8.5px] text-gray-400 bg-black/10 px-1 py-0.5 rounded leading-none group-hover:block shrink-0">
-                            [{style.tags.join(',')}]
-                          </span>
+                          
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[8.5px] text-gray-400 bg-black/20 px-1 py-0.5 rounded leading-none">
+                              [{style.tags.join(',')}]
+                            </span>
+                            
+                            {/* 👈 زر السهم لفتح نافذة إعدادات النمط وتعديله */}
+                            {onEditStyle && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // يمنع تحديد النمط عند الضغط على السهم
+                                  onEditStyle(style, folder.id);
+                                }}
+                                className="text-gray-400 hover:text-white px-1 py-0.5 font-bold text-xs select-none transition"
+                                title="تعديل تفاصيل وإعدادات النمط"
+                              >
+                                ▼
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -711,28 +757,28 @@ export function Sidebar({
           <div className="grid grid-cols-3 gap-1 mt-1.5">
             <button
               onClick={onAddFolder}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded transition select-none truncate"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded-lg transition select-none truncate"
               id="add-folder-btn"
             >
               + مجلد
             </button>
             <button
               onClick={onAddStyle}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded transition select-none truncate"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded-lg transition select-none truncate"
               id="add-style-btn"
             >
               + نمط
             </button>
             <button
               onClick={onOpenStylesExportSelector}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded transition select-none truncate"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 px-1 rounded-lg transition select-none truncate"
               id="export-styles-selector-btn"
             >
               تصدير مخصص
             </button>
           </div>
           <div className="grid grid-cols-1 mt-1">
-            <label className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 rounded transition select-none text-center cursor-pointer block truncate">
+            <label className="bg-[#2d2d2d] border border-[#3c3c3c] text-white hover:bg-[#3d3d3d] text-[10px] py-1 rounded-lg transition select-none text-center cursor-pointer block truncate">
               استيراد مجلد فردي
               <input
                 type="file"
@@ -808,7 +854,7 @@ export function Sidebar({
               step="0.05"
               value={lineHeight}
               onChange={e => setLineHeight(parseFloat(e.target.value) || 1.1)}
-              className="w-24 bg-[#2d2d2d] border border-[#2d2d2d] text-white text-[11px] px-1.5 py-0.5 rounded outline-none focus:border-[#007acc] text-center animate-none"
+              className="w-24 bg-[#2d2d2d] border border-[#2d2d2d] text-white text-[11px] px-1.5 py-0.5 rounded outline-none focus:border-[#007acc] text-center"
               id="prop-line-height"
             />
           </div>
@@ -874,7 +920,7 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* 👈 هنا نضع ميزة اختيار الخطوط المفضلة المضافة حديثاً */}
+          {/* خطوط المفضلة */}
           {favFonts && favFonts.length > 0 && (
             <div className="flex items-center justify-between text-[11px] gap-2 border-t border-[#2d2d2d]/40 pt-2 mt-0.5">
               <label className="text-[#f5c518] truncate font-semibold">⭐ خطوطك المفضلة</label>
@@ -883,7 +929,7 @@ export function Sidebar({
                 onChange={e => {
                   if (e.target.value) setFontFamily(e.target.value);
                 }}
-                className="w-[170px] bg-[#1a2d1d] border border-green-800 text-[#7be09c] text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-green-600 font-bold cursor-pointer"
+                className="w-[170px] bg-[#1a2d1d] border border-green-800 text-[#7be09c] text-[10px] px-1.5 py-0.5 rounded-lg outline-none focus:border-green-600 font-bold cursor-pointer"
                 id="prop-fav-fonts-select"
               >
                 <option value="" disabled className="text-gray-500">اختر من المفضلة...</option>
@@ -975,7 +1021,7 @@ export function Sidebar({
           <div className="flex gap-1.5 mt-1.5">
             <button
               onClick={onSaveCurrentPreset}
-              className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded text-[10px] shadow transition truncate"
+              className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow transition truncate"
               id="save-preset-btn"
             >
               💾 حفظ النمط الحالي
@@ -1036,7 +1082,7 @@ export function Sidebar({
             <div className="flex gap-1.5">
               <button
                 onClick={onApplyTatweel}
-                className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded text-[10px] shadow font-medium transition"
+                className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow font-medium transition"
                 id="tatweel-apply-btn"
               >
                 تطبيق ـ التمطيط
@@ -1090,7 +1136,7 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* 📐 شريط الأشكال الخمسة لاختيار وتعديل التنسيق يدوياً لمطابقة الصور بدقة */}
+        {/* شريط الأشكال الخمسة لاختيار وتعديل التنسيق يدوياً */}
         <div className="flex flex-col gap-1 border-t border-[#2d2d2d]/40 pt-2 mt-1 select-none">
           <span className="text-[10px] text-gray-500 font-bold mb-1 text-right">📐 نمط شكل الفقاعة النشط:</span>
           <div className="grid grid-cols-5 gap-1 text-center" id="custom-shape-selector-footer">
@@ -1148,7 +1194,7 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              onClick={() => onSelectBubbleShape('vertical_oval')} // 👈 بيضاوية رأسية
+              onClick={() => onSelectBubbleShape('vertical_oval')}
               className={`py-1 rounded text-[9.5px] font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
                 detectedBubbleType === 'vertical_oval' 
                   ? 'bg-[#007acc] text-white border border-[#0098ff]' 
