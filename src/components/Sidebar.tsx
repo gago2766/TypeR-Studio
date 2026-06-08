@@ -665,7 +665,8 @@ export function Sidebar({
           <h3 className="text-xs text-white uppercase font-bold mb-1 border-b border-[#2d2d2d] pb-1">
             مجلدات الأنماط (تصدير فردي)
           </h3>
-          <div id="folders-container" className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-0.5">
+          {/* 👈 تم إزالة القيود الارتفاعية والنوافذ الفرعية لتعمل قائمة المجلدات وتنساب الأنماط بحركة تمرير سلسة للغاية مع الشريط الجانبي */}
+          <div id="folders-container" className="flex flex-col gap-2 pr-0.5">
             {folders.length === 0 ? (
               <div className="text-center text-gray-600 text-[10px] py-4 bg-[#151515] rounded border border-dashed border-[#2d2d2d]">
                 لا توجد مجلدات حالياً
