@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -183,9 +185,26 @@ export default function App() {
   // 📏 خيار هامش أمان أسطر الفقاعات
   const [bubbleMargin, setBubbleMargin] = useState<number>(10);
 
-  // المجلدات والأنماط المنسقة
-  const [folders, setFolders] = useState<StyleFolder[]>(INITIAL_FOLDERS);
+  // 👈 المجلدات والأنماط المنسقة مع استعادتها تلقائياً من التخزين المحلي عند فتح التطبيق
+  const [folders, setFolders] = useState<StyleFolder[]>(() => {
+    try {
+      const saved = localStorage.getItem('typer_studio_folders');
+      return saved ? JSON.parse(saved) : INITIAL_FOLDERS;
+    } catch (e) {
+      return INITIAL_FOLDERS;
+    }
+  });
+  
   const [selectedStyleId, setSelectedStyleId] = useState<string>('style_normal');
+
+  // مزامنة المجلدات والأنماط وحفظها تلقائياً وبشكل فوري عند حدوث أي تعديل (إضافة، حذف، تحرير)
+  useEffect(() => {
+    try {
+      localStorage.setItem('typer_studio_folders', JSON.stringify(folders));
+    } catch (e) {
+      console.error('Error auto-saving folders:', e);
+    }
+  }, [folders]);
 
   // خصائص تنسيق خطوط النص للطبقة النشطة
   const [fontFamily, setFontFamily] = useState<string>('Tahoma, sans-serif');
@@ -2726,14 +2745,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') {
+        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape,
+          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
