@@ -242,6 +242,7 @@ export default function App() {
     scaleY: number; 
     shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval'; // 👈 بيضاوية رأسية
     mask?: Uint8Array;
+    seedColor?: string; // تبييض الفقاعات بلونها الأصلي
   }>>([]);
 
   // إعدادات العلامة المائية
@@ -282,6 +283,7 @@ export default function App() {
   const [editFormUnderline, setEditFormUnderline] = useState(false);
   const [editFormTags, setEditFormTags] = useState('');
   const [editFormTagColor, setEditFormTagColor] = useState('#FFF3B0');
+  const [wandSeedColor, setWandSeedColor] = useState<string>('#ffffff'); // لون تبييض الفقاعة المكتشف تلقائياً
 
   // قائمة إشعارات الـ Toast للتنبيهات السريعة
   const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: 'error' | 'success' }>>([]);
@@ -832,7 +834,7 @@ export default function App() {
     renderImg.src = page.src;
   };
 
-  // تبييض المساحة النشطة المحددة بضربة العصا السحرية
+  // تبييض المساحة النشطة المحددة بضربة العصا السحرية؛ تم تعديلها لتلوين الفقاعة بلونها المكتشف تلقائياً
   const handleWhitenWandSelection = () => {
     if (!wandMask || !wandDimensions) {
       addToast('⚠️ الرجاء تحديد مساحة بالعصا السحرية أولاً لتبييضها', 'error');
@@ -859,8 +861,11 @@ export default function App() {
     const data = imgData.data;
 
     let fillR = 255, fillG = 255, fillB = 255, fillA = 255;
-    if (brushColor && brushColor.startsWith('#')) {
-      const hex = brushColor.substring(1);
+    
+    // استخدام لون الفقاعة الخلفي المكتشف بدقة (سواء أسود، ذهبي، أو أبيض) بدلاً من افتراض اللون الأبيض دائماً
+    const activeColor = wandSeedColor || '#ffffff';
+    if (activeColor.startsWith('#')) {
+      const hex = activeColor.substring(1);
       if (hex.length === 3) {
         fillR = parseInt(hex[0] + hex[0], 16);
         fillG = parseInt(hex[1] + hex[1], 16);
@@ -939,7 +944,7 @@ export default function App() {
     }
   };
 
-  // خوارزمية العصا السحرية لتحديد حواف وهيكل الفقاعات آلياً
+  // خوارزمية العصا السحرية لتحديد حواف وهيكل الفقاعات آلياً مع ميزة تخطي العوائق والتدريج اللوني المبتكرة
   const handleWandSelect = (clickX: number, clickY: number) => {
     const img = document.getElementById('manga-img') as HTMLImageElement;
     if (!img || !img.naturalWidth) {
@@ -974,6 +979,10 @@ export default function App() {
     }
     const sR = data[si], sG = data[si + 1], sB = data[si + 2];
 
+    // حفظ لون بكسل البداية للفقاعة المحددة لاستخدامه لاحقاً في التبييض التلقائي بلونها الأصلي
+    const hexColor = "#" + ((1 << 24) + (sR << 16) + (sG << 8) + sB).toString(16).slice(1);
+    setWandSeedColor(hexColor);
+
     const tolerance = wandTolerance;
     const mask = new Uint8Array(imgW * imgH);
 
@@ -992,6 +1001,13 @@ export default function App() {
     queue[tail++] = py * imgW + px;
     mask[py * imgW + px] = 1;
 
+    const dirs = [
+      { dx: -1, dy: 0 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: -1 },
+      { dx: 0, dy: 1 }
+    ];
+
     while (head < tail) {
       const pos = queue[head++];
       const cx = pos % imgW;
@@ -1002,37 +1018,51 @@ export default function App() {
       if (cy < minY) minY = cy;
       if (cy > maxY) maxY = cy;
 
-      const neighbors = [
-        cx > minX_limit ? pos - 1 : -1,
-        cx < maxX_limit ? pos + 1 : -1,
-        cy > minY_limit ? pos - imgW : -1,
-        cy < maxY_limit ? pos + imgW : -1
-      ];
-
       const p_idx = pos * 4;
       const pR = data[p_idx];
       const pG = data[p_idx + 1];
       const pB = data[p_idx + 2];
 
-      for (let k = 0; k < 4; k++) {
-        const np = neighbors[k];
-        if (np < 0 || mask[np]) continue;
-        const ni = np * 4;
-        if (data[ni + 3] < 30) continue;
+      for (let d = 0; d < 4; d++) {
+        const dir = dirs[d];
+        
+        // البحث بخطوات (تخطي عوائق أحرف النص بمقدار بكسلين لضمان عدم انقطاع التحديد بسبب الخط الداخلي)
+        for (let step = 1; step <= 2; step++) {
+          const nx = cx + dir.dx * step;
+          const ny = cy + dir.dy * step;
 
-        const dr = data[ni] - sR;
-        const dg = data[ni+1] - sG;
-        const db = data[ni+2] - sB;
-        const distToSeed = Math.sqrt(dr*dr + dg*dg + db*db);
+          if (nx < minX_limit || nx > maxX_limit || ny < minY_limit || ny > maxY_limit) {
+            break; 
+          }
 
-        const dpr = data[ni] - pR;
-        const dpg = data[ni+1] - pG;
-        const dpb = data[ni+2] - pB;
-        const distToParent = Math.sqrt(dpr*dpr + dpg*dpg + dpb*dpb);
+          const np = ny * imgW + nx;
+          if (mask[np]) {
+            break; 
+          }
 
-        if (distToSeed <= tolerance || (distToParent <= tolerance * 0.45 && distToSeed <= tolerance * 3.5)) {
-          mask[np] = 1;
-          queue[tail++] = np;
+          const ni = np * 4;
+          if (data[ni + 3] < 30) {
+            break; 
+          }
+
+          const dr = data[ni] - sR;
+          const dg = data[ni+1] - sG;
+          const db = data[ni+2] - sB;
+          const distToSeed = Math.sqrt(dr*dr + dg*dg + db*db);
+
+          const dpr = data[ni] - pR;
+          const dpg = data[ni+1] - pG;
+          const dpb = data[ni+2] - pB;
+          const distToParent = Math.sqrt(dpr*dpr + dpg*dpg + dpb*dpb);
+
+          // تفعيل تدريج لوني مرن وسخي جداً لتغطية الصناديق الذهبية والنظام بالكامل دون تسريب حواف الحدود الحادة
+          const matchesColor = (distToSeed <= tolerance || (distToParent <= tolerance * 0.7 && distToSeed <= tolerance * 5.0));
+
+          if (matchesColor) {
+            mask[np] = 1;
+            queue[tail++] = np;
+            break; // تم العثور على بكسل متطابق ناجح، توقف عن القفز أبعد في هذا الاتجاه
+          }
         }
       }
     }
@@ -1301,12 +1331,10 @@ export default function App() {
         scaleY: scaleY,
         shape: bType,
         mask: mask,
+        seedColor: hexColor, // 👈 تبييض الفقاعات المتعددة بلونها الأصلي
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
-      // تم تعطيل المسح الفوري ليبقى شريط الأدوات والتحديد نشطاً فوق آخر فقاعة مضافة لتسهيل الحركة
-      // clearWandSelection();
     } else {
-      // إظهار التنبيه فقط في حال عدم وجود طبقة نشطة يتم تحديثها تلقائياً
       if (!activeLayer) {
         addToast('✓ تم تحديد الفقاعة نجاحاً بالعصا');
       }
@@ -2752,6 +2780,7 @@ export default function App() {
     addToast(`✓ تم توزيع ولصق النص على عدد ${pasteCount} فقاعات دفعة واحدة`, 'success');
   };
 
+  // تبييض الفقاعات المتعددة المكتشفة تلقائياً بلونها الأصلي
   const handleWhitenBubbleQueue = () => {
     if (bubbleQueue.length === 0) {
       addToast('⚠️ قائمة الفقاعات فارغة، حدد فقاعات أولاً لتبييضها', 'error');
@@ -2779,26 +2808,27 @@ export default function App() {
     const imgData = ctx.getImageData(0, 0, imgW, imgH);
     const data = imgData.data;
 
-    let fillR = 255, fillG = 255, fillB = 255, fillA = 255;
-    if (brushColor && brushColor.startsWith('#')) {
-      const hex = brushColor.substring(1);
-      if (hex.length === 3) {
-        fillR = parseInt(hex[0] + hex[0], 16);
-        fillG = parseInt(hex[1] + hex[1], 16);
-        fillB = parseInt(hex[2] + hex[2], 16);
-      } else if (hex.length === 6) {
-        fillR = parseInt(hex.substring(0, 2), 16);
-        fillG = parseInt(hex.substring(2, 4), 16);
-        fillB = parseInt(hex.substring(4, 6), 16);
-      }
-    }
-
     bubbleQueue.forEach(b => {
       if (!b.mask) return;
       const bx = b.bboxX;
       const by = b.bboxY;
       const bw = b.bboxW;
       const bh = b.bboxH;
+
+      let fillR = 255, fillG = 255, fillB = 255, fillA = 255;
+      const activeColor = b.seedColor || '#ffffff';
+      if (activeColor.startsWith('#')) {
+        const hex = activeColor.substring(1);
+        if (hex.length === 3) {
+          fillR = parseInt(hex[0] + hex[0], 16);
+          fillG = parseInt(hex[1] + hex[1], 16);
+          fillB = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          fillR = parseInt(hex.substring(0, 2), 16);
+          fillG = parseInt(hex.substring(2, 4), 16);
+          fillB = parseInt(hex.substring(4, 6), 16);
+        }
+      }
 
       for (let cy = by; cy < by + bh; cy++) {
         if (cy < 0 || cy >= imgH) continue;
@@ -2823,7 +2853,7 @@ export default function App() {
 
     setBubbleQueue([]);
     clearWandSelection();
-    addToast(`✓ تم تبييض جميع الفقاعات المحددة دفعة واحدة! 🧼🎨`, 'success');
+    addToast(`✓ تم تبييض جميع الفقاعات المحددة بلونها الأصلي دفعة واحدة! 🧼🎨`, 'success');
   };
 
   // مراقبة اختصارات لوحة المفاتيح
@@ -3991,7 +4021,7 @@ export default function App() {
 
       {/* 👈 نافذة تحرير وتعديل النمط التفاعلية الشاملة (Style Editing Modal) */}
       {editingStyle && (
-        <div className="fixed inset-0 bg-black/80 z-[100000] flex items-center justify-center p-4 backdrop-blur-xs select-none" dir="rtl">
+        <div className="fixed inset-0 bg-black/85 z-[100000] flex items-center justify-center p-4 backdrop-blur-xs select-none" dir="rtl">
           <div className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg p-5 w-full max-w-md text-right flex flex-col gap-4 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#2d2d2d] pb-2">
               <span className="text-sm font-bold text-white">⚙️ تحرير وتعديل النمط التنسيقي</span>
