@@ -417,10 +417,13 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // معالجة نصوص السيناريو وتقسيمها إلى أسطر قابلة للقراءة والفلترة
+  // معالجة نصوص السيناريو وتقسيمها إلى أسطر وتصفيتها مع ميزة مطابقة وحذف علامات التنسيق المفتوحة والخاصة ذكياً
   useEffect(() => {
     const rawLines = scriptInput.split('\n');
     const parsed: ProcessedLine[] = [];
+
+    // تجميع كافة الأوسمة المخصصة من الأنماط الحالية للتحقق الديناميكي منها
+    const customStyleTags = folders.flatMap(f => f.styles.flatMap(s => s.tags.map(t => t.toLowerCase())));
 
     rawLines.forEach((raw, idx) => {
       let text = raw.trim();
@@ -439,10 +442,34 @@ export default function App() {
         isIgnored = true;
       }
 
-      const tagMatch = text.match(/^\[(.*?)\]\s*(.*)/);
-      if (tagMatch && !pageMatch) {
-        styleKey = tagMatch[1].toLowerCase();
-        text = tagMatch[2];
+      if (!isIgnored && !targetPageNum) {
+        // 1. أولاً: التحقق من التنسيق الافتراضي المحاط بأقواس مثل: [scream] نص
+        const bracketMatch = text.match(/^\[(.*?)\]\s*(.*)/);
+        if (bracketMatch) {
+          styleKey = bracketMatch[1].toLowerCase();
+          text = bracketMatch[2];
+        } else {
+          // 2. ثانياً: التحقق ديناميكياً من كافة العلامات المفتوحة والمخصصة (مثل "" أو SFX) لحذفها تماماً من الفقاعة
+          // نقوم بترتيب العلامات من الأطول للأقصر لتفادي التعارض عند مطابقتها
+          const sortedTags = [...customStyleTags].sort((a, b) => b.length - a.length);
+          
+          for (const tag of sortedTags) {
+            if (!tag) continue;
+            
+            // صياغة تعبير منتظم مرن يطابق العلامة في بداية السطر متبوعة اختيارياً بمسافات أو نقطتين ومسافات
+            const escapedTag = tag.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            
+            // يطابق العلامة في أول السطر متبوعة بنقطتين أو مسافات
+            const regex = new RegExp(`^${escapedTag}\\s*(?:[:：]\\s*)?(.*)`, 'i');
+            const match = text.match(regex);
+            
+            if (match) {
+              styleKey = tag;
+              text = match[1]; // حذف علامة التنسيق تماماً من النص المدخل والمحاذاة داخل الفقاعة!
+              break; // التوقف فور مطابقة أول علامة مخصصة بنجاح
+            }
+          }
+        }
       }
 
       parsed.push({
@@ -459,7 +486,7 @@ export default function App() {
     if (parsed.length > 0 && currentLineIndex === -1) {
       handleSelectLine(0);
     }
-  }, [scriptInput]);
+  }, [scriptInput, folders]); // 👈 تحديث الفرز الفوري للترجمة عند تعديل الأنماط أو المجلدات أو وسوم التحديد تلقائياً!
 
   const handleSelectLine = (index: number) => {
     if (index < 0 || index >= parsedLines.length) return;
