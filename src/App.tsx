@@ -1,19 +1,3 @@
-بلى، هذه فكرة ممتازة جداً وتوفر تجربة مستخدم (UX) فائقة السلاسة!
-
-يمكننا جعل زر "ممحاة الخلفية الذكية (Inpaint)" المشترك يقوم بالتحقق التلقائي
-والذكي في الخلفية:
-
-1.  إذا وجد مفتاح Gemini API Key مكتوباً، يقوم بتشغيل التبييض عبر خوادم Google
-    Gemini.
-2.  إذا وجد حقل Gemini فارغاً ووجد رمز Hugging Face Token مكتوباً، يقوم تلقائياً
-    وبسلاسة بتشغيل التبييض السحابي عبر خوادم Hugging Face (والذي يتميز بأنه
-    مجاني تماماً ويعمل في الدول العربية مثل مصر ودول أوروبا مباشرة دون
-    الحاجة لتشغيل أي تطبيق VPN!).
-
-لعمل ذلك، سنقوم بتعديل ملف واحد فقط وهو src/App.tsx، ليعمل التبديل السحابي
-التلقائي والذكي خلف الكواليس، وإليك الملف بالكامل جاهزاً للنسخ واللصق
-المباشر:
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -1552,7 +1536,8 @@ export default function App() {
         fontFamily,
         lineHeight,
         tracking,
-        bubbleMargin
+        bubbleMargin,
+        activeLayer?.lineCountOverride
       );
       layStyle.fontSize = `${opt.fontSize}px`;
       txt = opt.textWithBreaks;
@@ -2795,14 +2780,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
+        } else if (b.shape === 'vertical_oval') {
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
+          b.shape,
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
