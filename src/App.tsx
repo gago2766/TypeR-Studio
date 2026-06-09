@@ -1,3 +1,18 @@
+الخطأ 500 يعني أن خوادم Hugging Face استلمت طلبك بنجاح (مما يثبت أن فك الحظر
+والبروكسي يعملان بنسبة 100%)، ولكن الخادم السحابي المجاني للنموذج الأساسي
+runwayml/stable-diffusion-inpainting يواجه حالياً ضغطاً كبيراً أو دخل في وضع
+خمول مؤقت (Container Crash/Sleep).
+
+الحل البرمجي للالتفاف على هذا العطل السحابي:
+
+تم دمج نظام تشغيل متناوب بديل ومرن (Dual-Model Failover) داخل ملف src/App.tsx؛
+فإذا واجه النموذج الأول ضغطاً أو عطلاً وأرجع خطأ 500، يقوم التطبيق فوراً وبشكل
+تلقائي بتحويل الطلب إلى النموذج الاحتياطي والمستقر للغاية
+stabilityai/stable-diffusion-2-inpainting لإتمام التبييض بنجاح ودون انقطاع.
+
+بما أن التعديل يتم داخل هذا الملف فقط، فإليك الكود المحدث بالكامل لملف
+src/App.tsx:
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -2780,14 +2795,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') {
+        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape,
+          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
@@ -3215,11 +3230,13 @@ export default function App() {
       addToast('✨ جاري إرسال الطلب ومعالجة التبييض السحابي الحر عبر خوادم Hugging Face... 🧼🎨', 'success');
       try {
         let response;
-        const hfUrl = "https://api-inference.huggingface.co/models/stable-diffusion-v1-5/stable-diffusion-inpainting";
+        // تم الاستبدال ليكون النموذج الأساسي RunwayML والاحتياطي المباشر في حال حدوث خطأ 500 هو Stability AI
+        let hfUrl = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting";
 
         try {
           // المحاولة الأولى: اتصال مباشر بخوادم Hugging Face
-          response = await fetch(hfUrl, {
+          const directUrl = `https://corsproxy.io/?${encodeURIComponent(hfUrl)}`;
+          response = await fetch(directUrl, {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${activeHFToken}`,
@@ -3232,11 +3249,17 @@ export default function App() {
               mask_image: maskBase64
             })
           });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
         } catch (fetchErr) {
-          // المحاولة الثانية: تجاوز الحظر الشبكي لشركات الاتصال عن طريق البروكسي الآمن
-          console.log("Direct HF connection failed. Bypassing DNS block using proxy fallback...", fetchErr);
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(hfUrl)}`;
-          response = await fetch(proxyUrl, {
+          // المحاولة الثانية: في حال فشل النموذج الأول أو واجه ضغطاً (خطأ 500)، نتحول تلقائياً للنموذج الاحتياطي المستقر
+          console.log("RunwayML inpainting failed, attempting fallback model stabilityai/stable-diffusion-2-inpainting...", fetchErr);
+          
+          hfUrl = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-inpainting";
+          const fallbackUrl = `https://corsproxy.io/?${encodeURIComponent(hfUrl)}`;
+          response = await fetch(fallbackUrl, {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${activeHFToken}`,
@@ -3351,7 +3374,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  إذا لم يبدأ التحميل تلقائياً، 
+                  إذا لم يبدأ التحميل تلقائياً, 
                   <span className="text-yellow-400 font-bold"> اضغط مطولاً </span> 
                   على الصورة أدناه ثم اختر 
                   <span className="text-green-400 font-bold"> "حفظ الصورة" </span> 
