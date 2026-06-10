@@ -78,21 +78,21 @@ export interface HistorySnapshot {
   cleaningDataUrl: string;
 }
 
-// تهيئة البنية والأنماط الافتراضية للعمل
+// تهيئة البنية والأنماط الافتراضية للعمل مع الحفاظ على الترتيب الأصلي
 const INITIAL_FOLDERS: StyleFolder[] = [
   {
     id: "folder_dialogue",
     name: "محادثات المانجا",
     styles: [
-      { id: "style_normal", name: "عادي", fontSize: "auto", color: "#000000", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Tahoma, sans-serif", tags: ["n", "normal"], enabled: true, tagColor: "#FFF3B0" },
-      { id: "style_thought", name: "تفكير داخلي", fontSize: "auto", color: "#444444", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Arial, sans-serif", tags: ["t", "thought"], enabled: true, tagColor: "#A3E4D7" }
+      { id: "style_normal", name: "عادي", fontSize: "auto", color: "#000000", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Tahoma, sans-serif", tags: ["n", "normal"], enabled: true, tagColor: "#FFF3B0", updatedAt: 1 },
+      { id: "style_thought", name: "تفكير داخلي", fontSize: "auto", color: "#444444", bgColor: "transparent", tracking: 0, lineHeight: 1.25, textAlign: "center", fontFamily: "Arial, sans-serif", tags: ["t", "thought"], enabled: true, tagColor: "#A3E4D7", updatedAt: 2 }
     ]
   },
   {
     id: "folder_sfx",
     name: "المؤثرات الصوتية",
     styles: [
-      { id: "style_scream", name: "صراخ غاضب", fontSize: "auto", color: "#e81123", bgColor: "transparent", tracking: 1, lineHeight: 1.1, textAlign: "center", fontFamily: "Impact, sans-serif", tags: ["s", "scream"], enabled: true, tagColor: "#FADBD8" }
+      { id: "style_scream", name: "صراخ غاضب", fontSize: "auto", color: "#e81123", bgColor: "transparent", tracking: 1, lineHeight: 1.1, textAlign: "center", fontFamily: "Impact, sans-serif", tags: ["s", "scream"], enabled: true, tagColor: "#FADBD8", updatedAt: 3 }
     ]
   }
 ];
@@ -520,15 +520,24 @@ export default function App() {
       return;
     }
 
-    let matchedStyle: TextStyle | null = null;
+    // تجميع كافة الأنماط المطابقة لعلامة السطر
+    let matchingStyles: TextStyle[] = [];
     folders.forEach(f => {
-      if (!matchedStyle) {
-        matchedStyle = f.styles.find(s => s.tags.includes(line.styleKey) && s.enabled) || null;
-      }
+      f.styles.forEach(s => {
+        if (s.tags.includes(line.styleKey) && s.enabled) {
+          matchingStyles.push(s);
+        }
+      });
     });
 
-    if (matchedStyle) {
-      setSelectedStyleId((matchedStyle as TextStyle).id);
+    if (matchingStyles.length > 0) {
+      // ترتيب تصاعدي حسب تاريخ التعديل الأول/الأقدم ليعطي الأولوية للنمط الذي تم تعديله أولاً وبشكل مستقر تماماً
+      matchingStyles.sort((a, b) => {
+        const timeA = a.updatedAt || 0;
+        const timeB = b.updatedAt || 0;
+        return timeA - timeB;
+      });
+      setSelectedStyleId(matchingStyles[0].id);
     } else {
       setSelectedStyleId('style_normal');
     }
@@ -997,7 +1006,7 @@ export default function App() {
     }
   };
 
-  // خوارزمية العصا السحرية لتحديد حواف وهيكل الفقاعات آلياً مع ميزة تخطي العوائق والتدريج اللوني المبتكرة
+  // خوارزمية العصا السحرية الدقيقة جداً (1 بكسل للتوقف الفوري عند الحواف والحدود ومنع تسريب الألوان)
   const handleWandSelect = (clickX: number, clickY: number) => {
     const img = document.getElementById('manga-img') as HTMLImageElement;
     if (!img || !img.naturalWidth) {
@@ -1031,6 +1040,7 @@ export default function App() {
       return;
     }
     const sR = data[si], sG = data[si + 1], sB = data[si + 2];
+    const seedLuminance = 0.299 * sR + 0.587 * sG + 0.114 * sB; // 👈 حساب سطوع البكسل المستهدف للفقاعة
 
     // حفظ لون بكسل البداية للفقاعة المحددة لاستخدامه لاحقاً في التبييض التلقائي بلونها الأصلي
     const hexColor = "#" + ((1 << 24) + (sR << 16) + (sG << 8) + sB).toString(16).slice(1);
@@ -1071,51 +1081,53 @@ export default function App() {
       if (cy < minY) minY = cy;
       if (cy > maxY) maxY = cy;
 
-      const p_idx = pos * 4;
-      const pR = data[p_idx];
-      const pG = data[p_idx + 1];
-      const pB = data[p_idx + 2];
-
       for (let d = 0; d < 4; d++) {
         const dir = dirs[d];
-        
-        // البحث بخطوات (تخطي عوائق أحرف النص بمقدار بكسلين لضمان عدم انقطاع التحديد بسبب الخط الداخلي)
-        for (let step = 1; step <= 2; step++) {
-          const nx = cx + dir.dx * step;
-          const ny = cy + dir.dy * step;
+        const nx = cx + dir.dx;
+        const ny = cy + dir.dy;
 
-          if (nx < minX_limit || nx > maxX_limit || ny < minY_limit || ny > maxY_limit) {
-            break; 
+        if (nx < minX_limit || nx > maxX_limit || ny < minY_limit || ny > maxY_limit) {
+          continue; 
+        }
+
+        const np = ny * imgW + nx;
+        if (mask[np]) {
+          continue; 
+        }
+
+        const ni = np * 4;
+        const nR = data[ni];
+        const nG = data[ni + 1];
+        const nB = data[ni + 2];
+        const nA = data[ni + 3];
+
+        if (nA < 30) {
+          continue; 
+        }
+
+        const dr = nR - sR;
+        const dg = nG - sG;
+        const db = nB - sB;
+        const distToSeed = Math.sqrt(dr*dr + dg*dg + db*db);
+
+        let matchesColor = distToSeed <= tolerance;
+
+        // 🛡️ حاجز حماية صلب: منع عبور أو التحديد فوق الخطوط والحدود السوداء تماماً
+        if (seedLuminance > 120) {
+          const targetLuminance = 0.299 * nR + 0.587 * nG + 0.114 * nB;
+          if (targetLuminance < 85) {
+            matchesColor = false; 
           }
-
-          const np = ny * imgW + nx;
-          if (mask[np]) {
-            break; 
+        } else if (seedLuminance < 85) {
+          const targetLuminance = 0.299 * nR + 0.587 * nG + 0.114 * nB;
+          if (targetLuminance > 130) {
+            matchesColor = false;
           }
+        }
 
-          const ni = np * 4;
-          if (data[ni + 3] < 30) {
-            break; 
-          }
-
-          const dr = data[ni] - sR;
-          const dg = data[ni+1] - sG;
-          const db = data[ni+2] - sB;
-          const distToSeed = Math.sqrt(dr*dr + dg*dg + db*db);
-
-          const dpr = data[ni] - pR;
-          const dpg = data[ni+1] - pG;
-          const dpb = data[ni+2] - pB;
-          const distToParent = Math.sqrt(dpr*dpr + dpg*dpg + dpb*dpb);
-
-          // تفعيل تدريج لوني مرن وسخي جداً لتغطية الصناديق الذهبية والنظام بالكامل دون تسريب حواف الحدود الحادة
-          const matchesColor = (distToSeed <= tolerance || (distToParent <= tolerance * 0.7 && distToSeed <= tolerance * 5.0));
-
-          if (matchesColor) {
-            mask[np] = 1;
-            queue[tail++] = np;
-            break; // تم العثور على بكسل متطابق ناجح، توقف عن القفز أبعد في هذا الاتجاه
-          }
+        if (matchesColor) {
+          mask[np] = 1;
+          queue[tail++] = np;
         }
       }
     }
@@ -1851,7 +1863,8 @@ export default function App() {
       fontFamily: 'Arial, sans-serif',
       tags: [name.toLowerCase()],
       enabled: true,
-      tagColor: '#FFF3B0' // تلوين افتراضي جذاب لتمييز السطر في قائمة الترجمة
+      tagColor: '#FFF3B0', // تلوين افتراضي جذاب لتمييز السطر في قائمة الترجمة
+      updatedAt: Date.now() // 👈 ميزة تتبع زمن التعديل الأول لتحديد الأولويات بدقة
     };
 
     setFolders(prev =>
@@ -2780,14 +2793,14 @@ export default function App() {
         } else if (b.shape === 'thought_cloud') {
           layStyle.fontFamily = "'Times New Roman', serif";
           layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') { // 👈 تم تغيير circular لـ vertical_oval
+        } else if (b.shape === 'vertical_oval') {
           layStyle.fontFamily = 'Tahoma, sans-serif';
           layStyle.lineHeight = 1.3;
         }
 
         const opt = calculateOptimalFontSizeForShape(
           lineText,
-          b.shape, // 👈 التنسيق المباشر للبيضاوية الرأسية والأشكال الأخرى
+          b.shape,
           layerWidth,
           layerHeight,
           layStyle.fontFamily,
@@ -3359,7 +3372,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  إذا لم يبدأ التحميل تلقائياً, 
+                  إذا لم يبدأ التحميل تلقائياً، 
                   <span className="text-yellow-400 font-bold"> اضغط مطولاً </span> 
                   على الصورة أدناه ثم اختر 
                   <span className="text-green-400 font-bold"> "حفظ الصورة" </span> 
@@ -4378,7 +4391,8 @@ export default function App() {
                     bold: editFormBold,
                     italic: editFormItalic,
                     underline: editFormUnderline,
-                    tagColor: editFormTagColor
+                    tagColor: editFormTagColor,
+                    updatedAt: editingStyle.style.updatedAt || Date.now() // 👈 الحفاظ على تاريخ التعديل الأول الأصلي
                   };
                   handleSaveEditedStyle(formattedStyle, editFormFolderId);
                 }}
@@ -4400,3 +4414,4 @@ export default function App() {
     </div>
   );
 }
+
