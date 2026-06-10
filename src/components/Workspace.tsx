@@ -98,6 +98,13 @@ export function Workspace({
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
+  // 📐 حالة تخزين وتتبع خطوط الإرشاد وحواف الفقاعة النشطة
+  const [guides, setGuides] = useState<{
+    vertical: number | null;
+    horizontal: number | null;
+    bounds: { left: number; top: number; right: number; bottom: number } | null;
+  }>({ vertical: null, horizontal: null, bounds: null });
+
   // مراجع لتتبع زوم اللمس بأصابع متعددة (Pinch to Zoom)
   const initialPinchDistRef = useRef<number | null>(null);
   const initialZoomRef = useRef<number | null>(null);
@@ -502,10 +509,52 @@ export function Workspace({
         }
 
         if (dragState) {
-          const dx = (touch.clientX - dragState.startX) / zoom;
-          const dy = (touch.clientY - dragState.startY) / zoom;
-          const newLeft = dragState.startLeft + dx;
-          const newTop = dragState.startTop + dy;
+          let dx = (touch.clientX - dragState.startX) / zoom;
+          let dy = (touch.clientY - dragState.startY) / zoom;
+          let newLeft = dragState.startLeft + dx;
+          let newTop = dragState.startTop + dy;
+
+          // 📐 إضافة المحاذاة المغناطيسية الذكية ورسم خطوط الإرشاد باللمس للهواتف
+          if (wandDimensions && activeLayer && activeLayer.id === dragState.layerId) {
+            const dsx = wandDimensions.dispW / wandDimensions.imgW;
+            const dsy = wandDimensions.dispH / wandDimensions.imgH;
+            const bubbleLeft = wandDimensions.x * dsx;
+            const bubbleTop = wandDimensions.y * dsy;
+            const bubbleWidth = wandDimensions.w * dsx;
+            const bubbleHeight = wandDimensions.h * dsy;
+            const bubbleCenterX = bubbleLeft + bubbleWidth / 2;
+            const bubbleCenterY = bubbleTop + bubbleHeight / 2;
+
+            const layerWidth = parseFloat(activeLayer.width) || 120;
+            const layerHeight = parseFloat(activeLayer.height) || 80;
+
+            const snapThreshold = 6;
+            let snapX: number | null = null;
+            let snapY: number | null = null;
+
+            const proposedCenterX = newLeft + layerWidth / 2;
+            const proposedCenterY = newTop + layerHeight / 2;
+
+            if (Math.abs(proposedCenterX - bubbleCenterX) < snapThreshold) {
+              newLeft = bubbleCenterX - layerWidth / 2;
+              snapX = bubbleCenterX;
+            }
+            if (Math.abs(proposedCenterY - bubbleCenterY) < snapThreshold) {
+              newTop = bubbleCenterY - layerHeight / 2;
+              snapY = bubbleCenterY;
+            }
+
+            setGuides({
+              vertical: snapX,
+              horizontal: snapY,
+              bounds: {
+                left: bubbleLeft,
+                top: bubbleTop,
+                right: bubbleLeft + bubbleWidth,
+                bottom: bubbleTop + bubbleHeight
+              }
+            });
+          }
 
           onUpdateLayer(dragState.layerId, {
             left: `${newLeft}px`,
@@ -597,7 +646,9 @@ export function Workspace({
     rotateState,
     verticalMoveState,
     leftStretchState,
-    layers
+    layers,
+    activeLayer,       // 👈 إضافة لضمان تحديث المحاذاة الذكية باللمس
+    wandDimensions     // 👈 إضافة لضمان تحديث المحاذاة الذكية باللمس
   ]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -824,10 +875,52 @@ export function Workspace({
         visible: true,
       });
     } else if (dragState) {
-      const dx = (e.clientX - dragState.startX) / zoom;
-      const dy = (e.clientY - dragState.startY) / zoom;
-      const newLeft = dragState.startLeft + dx;
-      const newTop = dragState.startTop + dy;
+      let dx = (e.clientX - dragState.startX) / zoom;
+      let dy = (e.clientY - dragState.startY) / zoom;
+      let newLeft = dragState.startLeft + dx;
+      let newTop = dragState.startTop + dy;
+
+      // 📐 إضافة المحاذاة المغناطيسية الذكية ورسم خطوط الإرشاد
+      if (wandDimensions && activeLayer && activeLayer.id === dragState.layerId) {
+        const dsx = wandDimensions.dispW / wandDimensions.imgW;
+        const dsy = wandDimensions.dispH / wandDimensions.imgH;
+        const bubbleLeft = wandDimensions.x * dsx;
+        const bubbleTop = wandDimensions.y * dsy;
+        const bubbleWidth = wandDimensions.w * dsx;
+        const bubbleHeight = wandDimensions.h * dsy;
+        const bubbleCenterX = bubbleLeft + bubbleWidth / 2;
+        const bubbleCenterY = bubbleTop + bubbleHeight / 2;
+
+        const layerWidth = parseFloat(activeLayer.width) || 120;
+        const layerHeight = parseFloat(activeLayer.height) || 80;
+
+        const snapThreshold = 6;
+        let snapX: number | null = null;
+        let snapY: number | null = null;
+
+        const proposedCenterX = newLeft + layerWidth / 2;
+        const proposedCenterY = newTop + layerHeight / 2;
+
+        if (Math.abs(proposedCenterX - bubbleCenterX) < snapThreshold) {
+          newLeft = bubbleCenterX - layerWidth / 2;
+          snapX = bubbleCenterX;
+        }
+        if (Math.abs(proposedCenterY - bubbleCenterY) < snapThreshold) {
+          newTop = bubbleCenterY - layerHeight / 2;
+          snapY = bubbleCenterY;
+        }
+
+        setGuides({
+          vertical: snapX,
+          horizontal: snapY,
+          bounds: {
+            left: bubbleLeft,
+            top: bubbleTop,
+            right: bubbleLeft + bubbleWidth,
+            bottom: bubbleTop + bubbleHeight
+          }
+        });
+      }
 
       onUpdateLayer(dragState.layerId, {
         left: `${newLeft}px`,
@@ -966,6 +1059,8 @@ export function Workspace({
     if (leftStretchState) {
       setLeftStretchState(null);
     }
+    // 📐 تنظيف خطوط الإرشاد تماماً فور انتهاء السحب يدوياً
+    setGuides({ vertical: null, horizontal: null, bounds: null });
   };
 
   useEffect(() => {
@@ -1249,6 +1344,44 @@ export function Workspace({
                   alt="Watermark logo"
                 />
               )
+            )}
+          </div>
+        )}
+
+        {/* 📐 رسم خطوط الإرشاد والمحاذاة التفاعلية عند التوسيط أو الاقتراب من حواف الفقاعة */}
+        {dragState && guides.bounds && (
+          <div className="absolute inset-0 pointer-events-none z-20">
+            {/* حدود الفقاعة الأربعة كمستطيل متقطع */}
+            <div 
+              style={{
+                left: `${guides.bounds.left}px`,
+                top: `${guides.bounds.top}px`,
+                width: `${guides.bounds.right - guides.bounds.left}px`,
+                height: `${guides.bounds.bottom - guides.bounds.top}px`,
+              }}
+              className="absolute border border-dashed border-[#8e44ad]/40"
+            />
+            {/* خط الإرشاد الرأسي عند التوسيط الأفقي التام مع السنتر */}
+            {guides.vertical !== null && (
+              <div 
+                style={{
+                  left: `${guides.vertical}px`,
+                  top: `${guides.bounds.top}px`,
+                  height: `${guides.bounds.bottom - guides.bounds.top}px`,
+                }}
+                className="absolute border-l border-dashed border-[#007acc] w-0 -translate-x-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:bottom-0"
+              />
+            )}
+            {/* خط الإرشاد الأفقي عند التوسيط العمودي التام مع السنتر */}
+            {guides.horizontal !== null && (
+              <div 
+                style={{
+                  top: `${guides.horizontal}px`,
+                  left: `${guides.bounds.left}px`,
+                  width: `${guides.bounds.right - guides.bounds.left}px`,
+                }}
+                className="absolute border-t border-dashed border-[#007acc] h-0 -translate-y-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full before:absolute before:left-0 after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:right-0"
+              />
             )}
           </div>
         )}
@@ -1610,7 +1743,7 @@ export function Workspace({
                       left: '50%',
                       transform: 'translateX(-50%)',
                     }}
-                    className="w-8 h-7 bg-white text-gray-800 border border-neutral-600 rounded-full flex items-center justify-center text-[10px] shadow hover:scale-110 active:scale-90 transition-transform cursor-pointer z-40 select-none font-bold gap-0.5"
+                    className="w-8 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-[10px] shadow hover:scale-110 active:scale-90 transition-transform cursor-pointer z-40 select-none font-bold gap-0.5"
                     title="حفظ النمط والتنسيق الحالي كقالب جاهز للاستخدام الفوري"
                   >
                     ➕📂
@@ -1625,3 +1758,4 @@ export function Workspace({
   </div>
 );
 }
+
