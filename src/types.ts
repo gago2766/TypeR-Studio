@@ -14,6 +14,7 @@ export interface TextStyle {
   italic?: boolean;
   underline?: boolean;
   tagColor?: string; // 👈 ميزة لون التمييز التلقائي للوسوم
+  updatedAt?: number; // 👈 ميزة تتبع زمن التعديل لفرز الأولويات ومنع اختيار خطوط عشوائية
 }
 
 export interface StyleFolder {
