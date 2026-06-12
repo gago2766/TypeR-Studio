@@ -154,7 +154,7 @@ export function wrapTextToShape(
   tracking: number,
   marginPercent: number = 10, // القيمة الافتراضية للهامش هي 10%
   lineCountOverride?: number // التمرير الحسابي المباشر لعدد الأسطر
-): { lines: string[]; optimalFontSize: number } {
+): { lines: string[]; unstretchedLines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
   // تقسيم النص بناءً على فواصل الأسطر اليدوية للحفاظ على رغبة المترجم
@@ -211,7 +211,7 @@ export function wrapTextToShape(
   });
 
   if (allWords.length === 0) {
-    return { lines: [''], optimalFontSize: fontSize };
+    return { lines: [''], unstretchedLines: [''], optimalFontSize: fontSize };
   }
 
   // تحديد المدى الحسابي للأسطر (الالتزام بـ lineCountOverride إن وجد)
@@ -307,7 +307,7 @@ export function wrapTextToShape(
     return line;
   });
 
-  return { lines: stretchedLines, optimalFontSize: fontSize };
+  return { lines: stretchedLines, unstretchedLines: bestLines, optimalFontSize: fontSize };
 }
 
 export function calculateOptimalFontSizeForShape(
@@ -339,7 +339,7 @@ export function calculateOptimalFontSizeForShape(
 
   while (low <= high) {
     const mid = (low + high) >> 1;
-    const { lines } = wrapTextToShape(
+    const { lines, unstretchedLines } = wrapTextToShape(
       text,
       bubbleType,
       containerWidth,
@@ -376,9 +376,9 @@ export function calculateOptimalFontSizeForShape(
         return containerWidth * ratio * pad;
       };
 
-      for (let i = 0; i < lines.length; i++) {
-        const limit = getWidthLimit(i, lines.length);
-        const w = measureWidth(lines[i], mid);
+      for (let i = 0; i < unstretchedLines.length; i++) {
+        const limit = getWidthLimit(i, unstretchedLines.length);
+        const w = measureWidth(unstretchedLines[i], mid);
         if (w > limit) {
           fits = false;
           break;
