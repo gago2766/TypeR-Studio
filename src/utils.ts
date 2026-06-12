@@ -153,7 +153,7 @@ export function wrapTextToShape(
   lineHeight: number,
   tracking: number,
   marginPercent: number = 10, // القيمة الافتراضية للهامش هي 10%
-  lineCountOverride?: number // 👈 الخاصية الجديدة لتمرير خيار التحديد اليدوي لعدد الأسطر
+  lineCountOverride?: number // التمرير الحسابي المباشر لعدد الأسطر
 ): { lines: string[]; optimalFontSize: number } {
   const lineH = fontSize * lineHeight;
   
@@ -181,31 +181,23 @@ export function wrapTextToShape(
       return maxW * padFactor;
     }
     
-    if (totalLines <= 1) {
-      let singleLineFactor = 0.85;
-      if (bubbleType === 'spiky_shout') singleLineFactor = 0.72;
-      if (bubbleType === 'thought_cloud') singleLineFactor = 0.78;
-      return maxW * singleLineFactor * padFactor;
-    }
-    
-    const totalLinesHeight = totalLines * lineH;
-    const centerYOffset = -(totalLinesHeight / 2) + (lineIndex * lineH) + (lineH / 2);
-    const semiHeight = maxH / 2;
-    const normalizedY = centerYOffset / Math.max(1, semiHeight);
-    
-    const clampedY = Math.max(-0.99, Math.min(0.99, normalizedY));
-    const t = Math.abs(clampedY); // معامل البُعد المتناظر عن المركز
+    // حساب الموضع الهندسي المتناظر t للأسطر ليعطي نسب مطابقة بدقة لملف PDF
+    const t = (totalLines <= 1) ? 0 : Math.abs((lineIndex - (totalLines - 1) / 2) / ((totalLines - 1) / 2));
     
     let ratio = 1.0;
     
     if (bubbleType === 'normal_oval') {
-      ratio = 1 - 0.55 * Math.pow(t, 1.25);
+      // بيضاوية السطر الأول والأخير متطابقين، المتوسطين متطابقين، والمنتصف هو الأكبر
+      ratio = 1.0 - 0.45 * Math.pow(t, 1.5);
     } else if (bubbleType === 'vertical_oval') {
-      ratio = 1 - 0.68 * Math.pow(t, 1.15);
+      // بيضاوية مطولة رأسياً: الأول والأخير الأصغر، الثاني والخامس المتوسطين، الثالث والرابع الأكبر
+      ratio = 1.0 - 0.55 * Math.pow(t, 1.2);
     } else if (bubbleType === 'thought_cloud') {
-      ratio = 1 - 0.45 * Math.pow(t, 1.3);
+      // التفكير أعرض قليلاً من العادية
+      ratio = 1.0 - 0.35 * Math.pow(t, 1.4);
     } else if (bubbleType === 'spiky_shout') {
-      ratio = (1 - 0.55 * Math.pow(t, 2.0)) * 0.75;
+      // الصراخ: الأول والأخير متطابقين، الثاني والخامس متطابقين، الثالث والرابع متطابقين والمنتصف الأكبر
+      ratio = 1.0 - 0.6 * Math.pow(t, 2.2);
     }
     
     return maxW * ratio * padFactor;
@@ -303,11 +295,11 @@ export function wrapTextToShape(
     }
   }
 
-  // 👈 تطبيق التمطيط (الكشيدة) التلقائي فقط على السطر الأول والسطر الأخير، وعدم المساس بالأسطر المتوسطة
+  // تطبيق الكشيدة والتمطيط التلقائي بعناية في أول سطر وآخر سطر فقط لتطابق هيكلية الأشكال 100%
   const stretchedLines = bestLines.map((line, idx) => {
     if (!line.trim()) return line;
     const limit = getWidthLimit(idx, bestLines.length);
-    
+
     // تفعيل التمطيط للسطر الأول والأخير فقط
     if (idx === 0 || idx === bestLines.length - 1) {
       return tatweelLine(line, limit, ctx!, fontSize, fontFamily, 4);
@@ -327,7 +319,7 @@ export function calculateOptimalFontSizeForShape(
   lineHeight: number,
   tracking: number,
   marginPercent: number = 10,
-  lineCountOverride?: number // 👈 نمرر الخاصية هنا لدمجها بمرونة
+  lineCountOverride?: number
 ): { fontSize: number; textWithBreaks: string } {
   let low = 8;
   let high = Math.min(80, Math.floor(containerHeight * 0.9));
@@ -335,6 +327,15 @@ export function calculateOptimalFontSizeForShape(
   let bestText = text;
 
   const padFactor = 1 - (marginPercent / 100);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const measureWidth = (str: string, fSize: number) => {
+    if (!ctx) return str.length * fSize * 0.55;
+    ctx.font = `${fSize}px ${fontFamily}`;
+    return ctx.measureText(str).width + (str.length > 0 ? (str.length - 1) * tracking : 0);
+  };
 
   while (low <= high) {
     const mid = (low + high) >> 1;
@@ -348,11 +349,44 @@ export function calculateOptimalFontSizeForShape(
       lineHeight,
       tracking,
       marginPercent,
-      lineCountOverride // 👈 التمرير الحسابي المباشر
+      lineCountOverride
     );
 
     const totalLinesHeight = lines.length * mid * lineHeight;
-    if (totalLinesHeight <= containerHeight * padFactor && lines.length > 0) {
+    let fits = totalLinesHeight <= containerHeight * padFactor && lines.length > 0;
+
+    // فحص حاسم للتحقق من أن عرض جميع الكلمات والأسطر لا يتجاوز الحدود القصوى للأشكال مع الهامش
+    if (fits) {
+      const getWidthLimit = (lineIndex: number, totalLines: number) => {
+        const pad = 1 - (marginPercent / 100);
+        if (bubbleType === 'narrative_box') {
+          return containerWidth * pad;
+        }
+        const t = (totalLines <= 1) ? 0 : Math.abs((lineIndex - (totalLines - 1) / 2) / ((totalLines - 1) / 2));
+        let ratio = 1.0;
+        if (bubbleType === 'normal_oval') {
+          ratio = 1.0 - 0.45 * Math.pow(t, 1.5);
+        } else if (bubbleType === 'vertical_oval') {
+          ratio = 1.0 - 0.55 * Math.pow(t, 1.2);
+        } else if (bubbleType === 'thought_cloud') {
+          ratio = 1.0 - 0.35 * Math.pow(t, 1.4);
+        } else if (bubbleType === 'spiky_shout') {
+          ratio = 1.0 - 0.6 * Math.pow(t, 2.2);
+        }
+        return containerWidth * ratio * pad;
+      };
+
+      for (let i = 0; i < lines.length; i++) {
+        const limit = getWidthLimit(i, lines.length);
+        const w = measureWidth(lines[i], mid);
+        if (w > limit) {
+          fits = false;
+          break;
+        }
+      }
+    }
+
+    if (fits) {
       bestFontSize = mid;
       bestText = lines.join('\n');
       low = mid + 1;
