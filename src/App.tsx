@@ -2758,18 +2758,58 @@ export default function App() {
 
     bubbleQueue.forEach(b => {
       if (lineIdx >= parsedLines.length) return;
-      const lineText = parsedLines[lineIdx].text;
+      const line = parsedLines[lineIdx];
+      const lineText = line.text;
+      const styleKey = line.styleKey;
+
+      // 🔍 البحث عن النمط المطابق للوسم (العلامة) الحالي لهذا السطر بالتحديد
+      let matchedStyle: TextStyle[] = [];
+      let matchingStyles: TextStyle[] = [];
+      
+      folders.forEach(f => {
+        f.styles.forEach(s => {
+          if (s.tags.includes(styleKey) && s.enabled) {
+            matchingStyles.push(s);
+          }
+        });
+      });
+
+      let selectedStyle: TextStyle | null = null;
+      if (matchingStyles.length > 0) {
+        matchingStyles.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
+        selectedStyle = matchingStyles[0];
+      } else {
+        // إذا لم يطابق شيء، يتم البحث عن النمط الافتراضي style_normal
+        folders.forEach(f => {
+          const found = f.styles.find(s => s.id === 'style_normal');
+          if (found) selectedStyle = found;
+        });
+      }
+
+      // استخراج خصائص النمط المطابق أو استخدام الخصائص العامة النشطة كبديل آمن
+      const activeFontFamily = selectedStyle ? selectedStyle.fontFamily : fontFamily;
+      const activeColor = selectedStyle ? selectedStyle.color : textColor;
+      const activeFontSize = selectedStyle ? (selectedStyle.fontSize === 'auto' ? 'auto' : `${selectedStyle.fontSize}`) : fontSize;
+      const activeBold = selectedStyle ? !!selectedStyle.bold : bold;
+      const activeItalic = selectedStyle ? !!selectedStyle.italic : italic;
+      const activeUnderline = selectedStyle ? !!selectedStyle.underline : underline;
+      const activeTextAlign = selectedStyle ? selectedStyle.textAlign : textAlign;
+      const activeLineHeight = selectedStyle ? (selectedStyle.lineHeight || 1.25) : lineHeight;
+      const activeTracking = selectedStyle ? selectedStyle.tracking : tracking;
+
+      // تحقق مما إذا كان هناك نمط مخصص مطابق (بخلاف النمط الافتراضي العام)
+      const isCustomStyleMatched = selectedStyle && selectedStyle.id !== 'style_normal';
 
       const layStyle = {
-        fontSize: fontSize === 'auto' ? '' : `${parseFloat(fontSize)}px`,
-        color: textColor,
-        fontFamily: fontFamily,
-        fontWeight: bold ? 'bold' : 'normal',
-        fontStyle: italic ? 'italic' : 'normal',
-        textDecoration: underline ? 'underline' : 'none',
-        textAlign: textAlign,
-        lineHeight: lineHeight,
-        letterSpacing: `${tracking}px`,
+        fontSize: activeFontSize === 'auto' ? '' : `${parseFloat(activeFontSize)}px`,
+        color: activeColor,
+        fontFamily: activeFontFamily,
+        fontWeight: activeBold ? 'bold' : 'normal',
+        fontStyle: activeItalic ? 'italic' : 'normal',
+        textDecoration: activeUnderline ? 'underline' : 'none',
+        textAlign: activeTextAlign,
+        lineHeight: activeLineHeight,
+        letterSpacing: `${activeTracking}px`,
         bgColor: 'transparent',
       };
 
@@ -2783,19 +2823,22 @@ export default function App() {
 
       let activeText = lineText;
       if (b.shape) {
-        if (b.shape === 'narrative_box') {
-          layStyle.fontFamily = 'Tahoma, sans-serif';
-          layStyle.fontWeight = 'bold';
-        } else if (b.shape === 'spiky_shout') {
-          layStyle.fontFamily = 'Impact, sans-serif';
-          layStyle.fontWeight = 'bold';
-          layStyle.lineHeight = 1.15;
-        } else if (b.shape === 'thought_cloud') {
-          layStyle.fontFamily = "'Times New Roman', serif";
-          layStyle.fontStyle = 'italic';
-        } else if (b.shape === 'vertical_oval') {
-          layStyle.fontFamily = 'Tahoma, sans-serif';
-          layStyle.lineHeight = 1.3;
+        // تطبيق الخطوط الافتراضية لشكل الفقاعة فقط إذا لم يتم التعرف على نمط مخصص (وسم) بالسطر
+        if (!isCustomStyleMatched) {
+          if (b.shape === 'narrative_box') {
+            layStyle.fontFamily = 'Tahoma, sans-serif';
+            layStyle.fontWeight = 'bold';
+          } else if (b.shape === 'spiky_shout') {
+            layStyle.fontFamily = 'Impact, sans-serif';
+            layStyle.fontWeight = 'bold';
+            layStyle.lineHeight = 1.15;
+          } else if (b.shape === 'thought_cloud') {
+            layStyle.fontFamily = "'Times New Roman', serif";
+            layStyle.fontStyle = 'italic';
+          } else if (b.shape === 'vertical_oval') {
+            layStyle.fontFamily = 'Tahoma, sans-serif';
+            layStyle.lineHeight = 1.3;
+          }
         }
 
         const opt = calculateOptimalFontSizeForShape(
@@ -2805,13 +2848,13 @@ export default function App() {
           layerHeight,
           layStyle.fontFamily,
           layStyle.lineHeight,
-          tracking,
+          activeTracking,
           bubbleMargin
         );
         layStyle.fontSize = `${opt.fontSize}px`;
         activeText = opt.textWithBreaks;
       } else if (!layStyle.fontSize) {
-        const optVal = calculateOptimalFontSize(lineText, layerWidth, layerHeight, fontFamily, lineHeight, tracking);
+        const optVal = calculateOptimalFontSize(lineText, layerWidth, layerHeight, activeFontFamily, activeLineHeight, activeTracking);
         layStyle.fontSize = `${optVal}px`;
       }
 
@@ -4414,4 +4457,3 @@ export default function App() {
     </div>
   );
 }
-
