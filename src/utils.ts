@@ -63,10 +63,6 @@ export function calculateOptimalFontSize(
   return best;
 }
 
-// =====================================================
-// التمطيط العربي (Tatweel / Kashida)
-// =====================================================
-
 const TATWEEL_CONNECTORS = new Set('بتثجحخسشصضطظعغفقكلمنهيئ'.split(''));
 
 export function canTatweel(ch: string): boolean {
@@ -83,10 +79,74 @@ function splitWord(word: string) {
 }
 
 /**
- * تمطيط سطر واحد ليصل إلى targetWidth
- * - يُطبَّق فقط على كلمات ≥ 4 أحرف لتجنب المبالغة
- * - الحد الأقصى للكشيدات لكل حرف = 2 لمنع الشكل الغريب
- * - إذا كان الفرق صغيراً (< 15%) يتم توزيعه بخفة
+ * تمطيط خفيف وجمالي لسطر واحد
+ * - يعمل فقط عندما يكون السطر أقصر من الحد بنسبة 22% أو أكثر
+ * - يختار أطول الكلمات أولاً للتوزيع الأجمل
+ * - حد أقصى كشيدتان لكل كلمة
+ * - يتوقف عند 90% من العرض المتاح
+ */
+export function tatweelLineLight(
+  line: string,
+  targetWidth: number,
+  ctx: CanvasRenderingContext2D,
+  fontSize: number,
+  fontFamily: string
+): string {
+  const TATWEEL = 'ـ';
+  const TARGET_FILL = 0.90;
+
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  const currentWidth = ctx.measureText(line).width;
+
+  if (currentWidth >= targetWidth * 0.78) return line;
+
+  const words = line.split(' ');
+  if (words.length < 2) return line;
+
+  type TatweelPos = { wordIndex: number; charIndex: number; wordLength: number };
+  const positions: TatweelPos[] = [];
+
+  words.forEach((word, wi) => {
+    const { prefix, core } = splitWord(word);
+    if (core.length < 4) return;
+    for (let ci = 0; ci < core.length - 1; ci++) {
+      if (canTatweel(core[ci])) {
+        positions.push({ wordIndex: wi, charIndex: prefix.length + ci, wordLength: core.length });
+      }
+    }
+  });
+
+  if (positions.length === 0) return line;
+
+  positions.sort((a, b) => b.wordLength - a.wordLength);
+
+  const tatweelCountPerWord: Record<number, number> = {};
+  const currentWords = [...words];
+  const charOffset: Record<number, number> = {};
+
+  for (const pos of positions) {
+    const wi = pos.wordIndex;
+    if ((tatweelCountPerWord[wi] ?? 0) >= 2) continue;
+
+    const offset = charOffset[wi] ?? 0;
+    const realCharIdx = pos.charIndex + offset;
+    const word = currentWords[wi];
+    if (realCharIdx >= word.length - 1) continue;
+
+    const newWord = word.slice(0, realCharIdx + 1) + TATWEEL + word.slice(realCharIdx + 1);
+    currentWords[wi] = newWord;
+    charOffset[wi] = (charOffset[wi] ?? 0) + 1;
+    tatweelCountPerWord[wi] = (tatweelCountPerWord[wi] ?? 0) + 1;
+
+    const newWidth = ctx.measureText(currentWords.join(' ')).width;
+    if (newWidth >= targetWidth * TARGET_FILL) break;
+  }
+
+  return currentWords.join(' ');
+}
+
+/**
+ * التمطيط اليدوي الكامل (زر التمطيط اليدوي فقط)
  */
 export function tatweelLine(
   text: string,
@@ -94,39 +154,22 @@ export function tatweelLine(
   ctx: CanvasRenderingContext2D,
   fontSize: number,
   fontFamily: string,
-  strength: number = 3
+  strength: number = 4
 ): string {
   const TATWEEL = 'ـ';
-  ctx.font = `${fontSize}px ${fontFamily}`;
-
-  const currentWidth = ctx.measureText(text).width;
-  // إذا كان النص يملأ أكثر من 96% من العرض المتاح فلا داعي للتمطيط
-  if (currentWidth >= targetWidth * 0.96) return text;
-
-  // إذا كان الفرق أقل من 8% فلا نمطط (النص مقبول بصرياً كما هو)
-  const gap = (targetWidth - currentWidth) / targetWidth;
-  if (gap < 0.08) return text;
-
   let words = text.split(' ');
 
-  // جمع المواضع القابلة للتمطيط مع تتبع كم كشيدة أضيفت لكل موضع
-  const eligiblePositions: Array<{
-    wordIndex: number;
-    charIndex: number;
-    count: number;
-  }> = [];
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  let currentWidth = ctx.measureText(words.join(' ')).width;
+  if (currentWidth >= targetWidth * 0.96) return text;
 
+  const eligiblePositions: Array<{ wordIndex: number; charIndex: number }> = [];
   words.forEach((word, wordIdx) => {
     const parts = splitWord(word);
-    // فقط للكلمات ذات 4 أحرف عربية أو أكثر
-    if (parts.core.length >= 4) {
+    if (parts.core.length >= 5) {
       for (let i = 0; i < parts.core.length - 1; i++) {
         if (canTatweel(parts.core[i])) {
-          eligiblePositions.push({
-            wordIndex: wordIdx,
-            charIndex: parts.prefix.length + i,
-            count: 0,
-          });
+          eligiblePositions.push({ wordIndex: wordIdx, charIndex: parts.prefix.length + i });
         }
       }
     }
@@ -134,42 +177,23 @@ export function tatweelLine(
 
   if (eligiblePositions.length === 0) return text;
 
-  // الحد الأقصى للكشيدات لكل موضع بناءً على strength
-  // strength=1 → max 1, strength=2 → max 2, strength=3+ → max 2
-  const maxPerPosition = Math.min(strength, 2);
-
   let attempts = 0;
-  const maxAttempts = eligiblePositions.length * maxPerPosition;
+  const maxAttempts = strength * 25;
 
   while (attempts < maxAttempts) {
-    const measuredWidth = ctx.measureText(words.join(' ')).width;
-    if (measuredWidth >= targetWidth * 0.96) break;
+    currentWidth = ctx.measureText(words.join(' ')).width;
+    if (currentWidth >= targetWidth * 0.97) break;
 
-    // اختر الموضع الذي له أقل كشيدات (توزيع متساوٍ)
-    const posIdx = attempts % eligiblePositions.length;
-    const pos = eligiblePositions[posIdx];
-
-    if (pos.count >= maxPerPosition) {
-      attempts++;
-      continue;
-    }
-
+    const pos = eligiblePositions[attempts % eligiblePositions.length];
     const word = words[pos.wordIndex];
-    words[pos.wordIndex] =
-      word.slice(0, pos.charIndex + 1) + TATWEEL + word.slice(pos.charIndex + 1);
+    words[pos.wordIndex] = word.slice(0, pos.charIndex + 1) + TATWEEL + word.slice(pos.charIndex + 1);
 
-    pos.count++;
-
-    // تحديث مواضع نفس الكلمة
     eligiblePositions.forEach(p => {
-      if (p.wordIndex === pos.wordIndex && p.charIndex > pos.charIndex) {
-        p.charIndex += 1;
-      }
+      if (p.wordIndex === pos.wordIndex && p.charIndex > pos.charIndex) p.charIndex += 1;
     });
 
     attempts++;
   }
-
   return words.join(' ');
 }
 
@@ -177,10 +201,6 @@ export function tatweelLine(
 // نسب عرض الأسطر لكل شكل فقاعة
 // =====================================================
 
-/**
- * t = 0 عند المنتصف ، t = 1 عند الأطراف
- * القيمة المُعادة = نسبة من (maxW * padFactor)
- */
 function getLineWidthRatio(
   lineIndex: number,
   totalLines: number,
@@ -190,25 +210,57 @@ function getLineWidthRatio(
   if (totalLines === 1) return 0.88;
 
   const mid = (totalLines - 1) / 2;
-  const t = Math.abs(lineIndex - mid) / mid; // 0..1
+  const t = Math.abs(lineIndex - mid) / mid;
 
   switch (bubbleType) {
-    case 'normal_oval':
-      return 0.60 + 0.35 * (1 - Math.pow(t, 1.4));
-    case 'vertical_oval':
-      return 0.52 + 0.40 * (1 - Math.pow(t, 1.2));
-    case 'spiky_shout':
-      return 0.45 + 0.45 * (1 - Math.pow(t, 2.0));
-    case 'thought_cloud':
-      return 0.65 + 0.27 * (1 - Math.pow(t, 1.6));
-    default:
-      return 0.85;
+    case 'normal_oval':   return 0.60 + 0.35 * (1 - Math.pow(t, 1.4));
+    case 'vertical_oval': return 0.52 + 0.40 * (1 - Math.pow(t, 1.2));
+    case 'spiky_shout':   return 0.45 + 0.45 * (1 - Math.pow(t, 2.0));
+    case 'thought_cloud': return 0.65 + 0.27 * (1 - Math.pow(t, 1.6));
+    default:              return 0.85;
   }
 }
 
 // =====================================================
-// التفاف النص داخل الفقاعة
+// حساب الأبعاد الدقيقة للفقاعة بعد تطبيق الهامش
+// يُستخدم في App.tsx عند التحديد بالعصا السحرية
 // =====================================================
+
+/**
+ * يحسب أبعاد صندوق النص الداخلي بناءً على أبعاد الفقاعة الخام ونسبة الهامش
+ * marginPercent: 5 أو 10 أو 15
+ * scaleX/scaleY: نسبة تحويل بكسل الصورة ← بكسل الشاشة
+ */
+export function computeLayerBoundsFromWand(params: {
+  bboxX: number;      // x بكسل الصورة
+  bboxY: number;      // y بكسل الصورة
+  bboxW: number;      // عرض الفقاعة بكسل الصورة
+  bboxH: number;      // ارتفاع الفقاعة بكسل الصورة
+  scaleX: number;     // imgWidth / dispWidth
+  scaleY: number;     // imgHeight / dispHeight
+  marginPercent: number; // 5 أو 10 أو 15
+}): { left: number; top: number; width: number; height: number } {
+  const { bboxX, bboxY, bboxW, bboxH, scaleX, scaleY, marginPercent } = params;
+
+  // تحويل من بكسل الصورة إلى بكسل الشاشة
+  const dispX = bboxX / scaleX;
+  const dispY = bboxY / scaleY;
+  const dispW = bboxW / scaleX;
+  const dispH = bboxH / scaleY;
+
+  // تطبيق الهامش بشكل مستقل على المحورين
+  // الهامش الأفقي والرأسي يُحسب كنسبة من البُعد الأصغر لحماية أشكال المستطيلات الطويلة
+  const marginRatio = marginPercent / 100;
+  const padX = dispW * marginRatio;
+  const padY = dispH * marginRatio;
+
+  return {
+    left:   dispX + padX,
+    top:    dispY + padY,
+    width:  Math.max(20, dispW - padX * 2),
+    height: Math.max(20, dispH - padY * 2),
+  };
+}
 
 export function wrapTextToShape(
   text: string,
@@ -237,10 +289,7 @@ export function wrapTextToShape(
 
   const allWords: string[] = [];
   text.split('\n').forEach(p => {
-    p.trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .forEach(w => allWords.push(w));
+    p.trim().split(/\s+/).filter(Boolean).forEach(w => allWords.push(w));
   });
 
   if (allWords.length === 0) {
@@ -260,8 +309,8 @@ export function wrapTextToShape(
     for (let li = 0; li < linesCount && wordIdx < allWords.length; li++) {
       const ratio = getLineWidthRatio(li, linesCount, bubbleType);
       const limit = maxW * padFactor * ratio;
-
       let lineWords: string[] = [];
+
       while (wordIdx < allWords.length) {
         const test = [...lineWords, allWords[wordIdx]].join(' ');
         if (measureWidth(test) <= limit) {
@@ -271,9 +320,7 @@ export function wrapTextToShape(
         }
       }
 
-      if (lineWords.length === 0 && wordIdx < allWords.length) {
-        lineWords.push(allWords[wordIdx++]);
-      }
+      if (lineWords.length === 0) lineWords.push(allWords[wordIdx++]);
       lines.push(lineWords.join(' '));
     }
 
@@ -282,15 +329,13 @@ export function wrapTextToShape(
       break;
     }
 
-    // خطة احتياطية عند maxL
     if (linesCount === maxL) {
       const perLine = Math.ceil(allWords.length / maxL);
-      const fallback: string[] = [];
+      bestLines = [];
       for (let i = 0; i < maxL; i++) {
         const chunk = allWords.slice(i * perLine, (i + 1) * perLine);
-        if (chunk.length > 0) fallback.push(chunk.join(' '));
+        if (chunk.length > 0) bestLines.push(chunk.join(' '));
       }
-      bestLines = fallback;
     }
   }
 
@@ -298,44 +343,20 @@ export function wrapTextToShape(
 
   const unstretchedLines = [...bestLines];
 
-  // =====================================================
-  // التمطيط التلقائي الخفيف على أول سطر وآخر سطر فقط
-  // بشرط أن يكون السطر أقصر من 80% من الحد المتاح
-  // =====================================================
+  // تمطيط خفيف على أول سطر وآخر سطر فقط (إذا كان هناك سطران أو أكثر)
   const stretchedLines = bestLines.map((line, idx) => {
-    if (!line.trim()) return line;
-
+    if (bestLines.length < 2) return line;
     const isFirst = idx === 0;
-    const isLast = idx === bestLines.length - 1;
-
-    // لا نمطط الأسطر الوسطى
+    const isLast  = idx === bestLines.length - 1;
     if (!isFirst && !isLast) return line;
-
-    // لا نمطط إذا كان هناك سطر واحد فقط (سيبدو مبالغاً)
-    if (bestLines.length === 1) return line;
 
     const ratio = getLineWidthRatio(idx, bestLines.length, bubbleType);
     const targetW = maxW * padFactor * ratio;
-    const currentW = ctx.measureText(line).width;
-
-    // نمطط فقط إذا كان السطر يشغل بين 55% و 88% من العرض المتاح
-    // (أقل من 55% = قد يبدو ممطوطاً جداً، أكثر من 88% = لا حاجة)
-    const fill = currentW / targetW;
-    if (fill < 0.55 || fill >= 0.88) return line;
-
-    return tatweelLine(line, targetW, ctx, fontSize, fontFamily, 2);
+    return tatweelLineLight(line, targetW, ctx, fontSize, fontFamily);
   });
 
-  return {
-    lines: stretchedLines,
-    unstretchedLines,
-    optimalFontSize: fontSize,
-  };
+  return { lines: stretchedLines, unstretchedLines, optimalFontSize: fontSize };
 }
-
-// =====================================================
-// حساب حجم الخط الأمثل للفقاعة
-// =====================================================
 
 export function calculateOptimalFontSizeForShape(
   text: string,
@@ -406,24 +427,24 @@ export function calculateOptimalFontSizeForShape(
   return { fontSize: bestFontSize, textWithBreaks: bestText };
 }
 
-// =====================================================
-// IndexedDB - حفظ واسترجاع الخطوط
-// =====================================================
+// ===================================================
+// IndexedDB - حفظ الخطوط
+// ===================================================
 
 export interface StoredFont {
   name: string;
   data: ArrayBuffer;
 }
 
-const DB_NAME = 'TypeRStudioFontsDB';
+const DB_NAME   = 'TypeRStudioFontsDB';
 const STORE_NAME = 'fonts';
 const DB_VERSION = 1;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror        = () => reject(request.error);
+    request.onsuccess      = () => resolve(request.result);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -437,9 +458,9 @@ export async function saveFont(name: string, data: ArrayBuffer): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put({ name, data });
-    request.onerror = () => reject(request.error);
+    const store       = transaction.objectStore(STORE_NAME);
+    const request     = store.put({ name, data });
+    request.onerror   = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
 }
@@ -449,9 +470,9 @@ export async function getFonts(): Promise<StoredFont[]> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onerror = () => reject(request.error);
+      const store       = transaction.objectStore(STORE_NAME);
+      const request     = store.getAll();
+      request.onerror   = () => reject(request.error);
       request.onsuccess = () => resolve(request.result || []);
     });
   } catch (error) {
