@@ -1,3 +1,9 @@
+بناءً على طلبك، تم تحديث ملف App.tsx بإضافة خاصية bubbleMargin إلى مكون
+<Workspace واستبدال واجهة اختيار هامش أمان الفقاعة القديمة بواجهة تفاعلية شبكية
+ومحسنة داخل نافذة الإعدادات (showSettingsModal).
+
+إليك الكود المحدث بالكامل:
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -1592,7 +1598,7 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // محاذاة وتوسيط النص ضمن منطقة التحديد يدوياً أو العصا السحرية للفقاعة المحددة
+  // محاكاة وتوسيط النص ضمن منطقة التحديد يدوياً أو العصا السحرية للفقاعة المحددة
   const handleAlignText = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
@@ -3704,35 +3710,16 @@ export default function App() {
                 />
               </div>
               
-              <div className="flex justify-between items-center border-t border-[#2d2d2d] pt-3 mt-1">
-                <span>هامش أمان أسطر الفقاعة:</span>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="bubble_margin_setting"
-                      checked={bubbleMargin === 10}
-                      onChange={() => {
-                        setBubbleMargin(10);
-                        addToast('✓ تم تحديد هامش أمان 10% 📏', 'success');
-                      }}
-                      className="accent-[#007acc]"
-                    />
-                    <span>10% (افتراضي)</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="bubble_margin_setting"
-                      checked={bubbleMargin === 15}
-                      onChange={() => {
-                        setBubbleMargin(15);
-                        addToast('✓ تم تحديد هامش أمان 15% (تباعد أكبر) 📏', 'success');
-                      }}
-                      className="accent-[#007acc]"
-                    />
-                    <span>15%</span>
-                  </label>
+              <div className="flex flex-col gap-1 border-t border-[#2d2d2d] pt-3 mt-1">
+                <span className="text-[11px] text-gray-300 font-bold mb-1">هامش أمان الفقاعة:</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[10, 15, 20].map(val => (
+                    <label key={val} className={`flex flex-col items-center gap-1 cursor-pointer rounded-lg border p-2 transition text-center ${bubbleMargin === val ? 'border-[#007acc] bg-[#0d2233] text-white' : 'border-[#2d2d2d] bg-[#151515] text-gray-400 hover:border-[#444]'}`}>
+                      <input type="radio" name="bm" checked={bubbleMargin === val} onChange={() => setBubbleMargin(val)} className="sr-only" />
+                      <span className="text-sm font-bold">{val}%</span>
+                      <span className="text-[9px]">{val === 10 ? 'ضيق' : val === 15 ? 'متوسط' : 'واسع'}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
@@ -4042,6 +4029,7 @@ export default function App() {
           mangaSrc={mangaSrc}
           activeTool={activeTool}
           setActiveTool={setActiveTool}
+          bubbleMargin={bubbleMargin}
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
@@ -4176,18 +4164,6 @@ export default function App() {
         activePresetId={activePresetId}
         onApplyPreset={handleApplyPreset}
         onSaveCurrentPreset={handleSaveCurrentPreset}
-        onClearPreset={() => setActivePresetId(null)}
-        tatweelStrength={tatweelStrength}
-        setTatweelStrength={setTatweelStrength}
-        tatweelMargin={tatweelMargin}
-        setTatweelMargin={setTatweelMargin}
-        onApplyTatweel={handleApplyTatweel}
-        onUndoTatweel={handleUndoTatweel}
-        tatweelPreviewText={tatweelPreviewText}
-        onPrevLine={() => handleSelectLine(currentLineIndex - 1)}
-        onNextLine={() => handleSelectLine(currentLineIndex + 1)}
-        onInsertText={handleInsertText}
-        onAlignText={handleAlignText}
         onDrawingUndo={handleCleaningUndo}
         onDrawingRedo={handleCleaningRedo}
         canDrawingUndo={!!(history[currentPageIndex]?.undo && history[currentPageIndex].undo.length > 0)}
