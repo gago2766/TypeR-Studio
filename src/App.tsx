@@ -1,9 +1,3 @@
-بناءً على طلبك، تم تحديث ملف App.tsx بإضافة خاصية bubbleMargin إلى مكون
-<Workspace واستبدال واجهة اختيار هامش أمان الفقاعة القديمة بواجهة تفاعلية شبكية
-ومحسنة داخل نافذة الإعدادات (showSettingsModal).
-
-إليك الكود المحدث بالكامل:
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
@@ -84,7 +78,7 @@ export interface HistorySnapshot {
   cleaningDataUrl: string;
 }
 
-// تهيئة البنية والأنماط الافتراضية للعمل مع الحفاظ على الترتيب الأصلي
+// تهيئة البنية والأنماط الافتراضية للعمل مع الحفاظ على التترتيب الأصلي
 const INITIAL_FOLDERS: StyleFolder[] = [
   {
     id: "folder_dialogue",
@@ -260,7 +254,7 @@ export default function App() {
 
   // معلومات وقناع العصا السحرية للفقاعة المكتشفة
   const [wandMask, setWandMask] = useState<Uint8Array | null>(null);
-  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null>(null); // 👈 تغيير circular لـ vertical_oval
+  const [detectedBubbleType, setDetectedBubbleType] = useState<'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null>(null);
   const [autoApplyBubbleStyle, setAutoApplyBubbleStyle] = useState<boolean>(true);
   const [edgeSegments, setEdgeSegments] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>>([]);
   
@@ -272,9 +266,9 @@ export default function App() {
     bboxH: number; 
     scaleX: number; 
     scaleY: number; 
-    shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval'; // 👈 بيضاوية رأسية
+    shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval';
     mask?: Uint8Array;
-    seedColor?: string; // تبييض الفقاعات بلونها الأصلي
+    seedColor?: string;
   }>>([]);
 
   // إعدادات العلامة المائية
@@ -315,7 +309,7 @@ export default function App() {
   const [editFormUnderline, setEditFormUnderline] = useState(false);
   const [editFormTags, setEditFormTags] = useState('');
   const [editFormTagColor, setEditFormTagColor] = useState('#FFF3B0');
-  const [wandSeedColor, setWandSeedColor] = useState<string>('#ffffff'); // لون تبييض الفقاعة المكتشف تلقائياً
+  const [wandSeedColor, setWandSeedColor] = useState<string>('#ffffff');
 
   // قائمة إشعارات الـ Toast للتنبيهات السريعة
   const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: 'error' | 'success' }>>([]);
@@ -501,7 +495,7 @@ export default function App() {
     if (parsed.length > 0 && currentLineIndex === -1) {
       handleSelectLine(0);
     }
-  }, [scriptInput, folders]); // 👈 تحديث الفرز الفوري للترجمة عند تعديل الأنماط أو المجلدات أو وسوم التحديد تلقائياً!
+  }, [scriptInput, folders]);
 
   const handleSelectLine = (index: number) => {
     if (index < 0 || index >= parsedLines.length) return;
@@ -632,7 +626,7 @@ export default function App() {
                   updatedLayer.style.lineHeight,
                   parseFloat(updatedLayer.style.letterSpacing) || 0,
                   bubbleMargin,
-                  updates.lineCountOverride // التمرير المباشر للقيمة الجديدة
+                  updates.lineCountOverride
                 );
                 
                 updatedLayer.text = opt.textWithBreaks;
@@ -1046,7 +1040,7 @@ export default function App() {
       return;
     }
     const sR = data[si], sG = data[si + 1], sB = data[si + 2];
-    const seedLuminance = 0.299 * sR + 0.587 * sG + 0.114 * sB; // 👈 حساب سطوع البكسل المستهدف للفقاعة
+    const seedLuminance = 0.299 * sR + 0.587 * sG + 0.114 * sB;
 
     // حفظ لون بكسل البداية للفقاعة المحددة لاستخدامه لاحقاً في التبييض التلقائي بلونها الأصلي
     const hexColor = "#" + ((1 << 24) + (sR << 16) + (sG << 8) + sB).toString(16).slice(1);
@@ -1296,7 +1290,7 @@ export default function App() {
     }
 
     const aspect = foundW / foundH;
-    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval'; // 👈 تغيير circular لـ vertical_oval
+    let bType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' = 'normal_oval';
     if (activePixels > 0) {
       const centerX = sumX / activePixels;
       const centerY = sumY / activePixels;
@@ -1327,8 +1321,8 @@ export default function App() {
         bType = 'spiky_shout';
       } else if (shapeCV > 0.082 && segments.length / Math.sqrt(bboxArea) > 3.0) {
         bType = 'thought_cloud';
-      } else if (aspect >= 0.5 && aspect <= 1.45) { // 👈 تم كشف والتمييز التلقائي ليكون أكثر دقة للفقاعة الدائرية والعمودية الطويلة معاً
-        bType = 'vertical_oval'; // 👈 التبديل لنمط بيضاوية رأسية
+      } else if (aspect >= 0.5 && aspect <= 1.45) {
+        bType = 'vertical_oval';
       } else {
         bType = 'normal_oval';
       }
@@ -1346,7 +1340,7 @@ export default function App() {
       h: foundH,
     });
 
-    // 👈 ربط وتحديث الطبقة النصية النشطة المحددة فوراً عند التحديد بالعصا السحرية لتبسيط العمل وتوزيع الحروف تلقائياً
+    // 👈 ربط وتحديث الطبقة النصية النشطة المحددة فوراً عند التحديد بالعصا السحرية
     if (activeLayer && !multiBubbleMode) {
       const previousLayers = [...currentLayers];
       
@@ -1364,7 +1358,6 @@ export default function App() {
       const layerHeight = Math.max(20, targetH - padY * 2);
 
       const opt = calculateOptimalFontSizeForShape(
-        // إزالة فواصل الأسطر لتوزيع الكلمات ديناميكياً بدقة
         activeLayer.text.replace(/\n/g, ' '),
         bType,
         layerWidth,
@@ -1373,7 +1366,7 @@ export default function App() {
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
         bubbleMargin,
-        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
+        activeLayer.lineCountOverride
       );
 
       handleUpdateLayer(activeLayer.id, {
@@ -1402,7 +1395,7 @@ export default function App() {
         scaleY: scaleY,
         shape: bType,
         mask: mask,
-        seedColor: hexColor, // 👈 تبييض الفقاعات المتعددة بلونها الأصلي
+        seedColor: hexColor,
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
     } else {
@@ -1467,7 +1460,7 @@ export default function App() {
       ctx.beginPath();
       edgeSegments.forEach(s => {
         ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
-        ctx.lineTo(s.x2 * dsx, s.y2 * dsy); // 👈 تم تصحيح الارتفاع بنجاح هنا
+        ctx.lineTo(s.x2 * dsx, dsy * s.y2);
       });
       ctx.stroke();
       ctx.restore();
@@ -1598,7 +1591,7 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // محاكاة وتوسيط النص ضمن منطقة التحديد يدوياً أو العصا السحرية للفقاعة المحددة
+  // محاذاة وتوسيط النص ضمن منطقة التحديد يدوياً أو العصا السحرية للفقاعة المحددة
   const handleAlignText = () => {
     if (!activeLayer) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
@@ -1617,7 +1610,7 @@ export default function App() {
     let targetH = 0;
     let isWandAlign = false;
 
-    const hasWand = wandDimensions !== null; // 👈 تفادي قيود قناع العصا السحرية لتعمل المحاذاة دوماً بنسبة 100% بمجرد وجود التحديد
+    const hasWand = wandDimensions !== null;
     const hasMarquee = selectionBox && selectionBox.width >= 10 && selectionBox.height >= 10;
 
     if (hasWand && wandDimensions) {
@@ -1653,7 +1646,6 @@ export default function App() {
     // إذا كانت المحاذاة داخل العصا السحرية، نوزع النص ديناميكياً ليطابق شكل الفقاعة تماماً
     if (isWandAlign && detectedBubbleType) {
       const opt = calculateOptimalFontSizeForShape(
-        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة التلقائية
         activeLayer.text.replace(/\n/g, ' '),
         detectedBubbleType,
         layerWidth,
@@ -1662,7 +1654,7 @@ export default function App() {
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
         bubbleMargin,
-        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
+        activeLayer.lineCountOverride
       );
       optSize = opt.fontSize;
       newText = opt.textWithBreaks;
@@ -1723,7 +1715,6 @@ export default function App() {
       const w = ctx.measureText(line).width;
       if (w >= targetW * 0.95) return line;
       
-      // 👈 تم تعديل دالة التمطيط يدوياً لتلتزم بالتمطيط للسطر الأول والأخير فقط
       if (idx === 0 || idx === lines.length - 1) {
         return tatweelLine(line, targetW, ctx, fontSz, activeLayer.style.fontFamily, tatweelStrength);
       }
@@ -1845,7 +1836,6 @@ export default function App() {
 
     let targetFolderId = folders[0].id;
 
-    // تمكين خيار اختيار المجلد المستهدف عند وجود مجلدين أو أكثر
     if (folders.length > 1) {
       const folderListStr = folders.map((f, i) => `${i + 1}. ${f.name}`).join('\n');
       const selection = prompt(`اختر رقم المجلد لإضافة النمط إليه:\n${folderListStr}`, "1");
@@ -1869,8 +1859,8 @@ export default function App() {
       fontFamily: 'Arial, sans-serif',
       tags: [name.toLowerCase()],
       enabled: true,
-      tagColor: '#FFF3B0', // تلوين افتراضي جذاب لتمييز السطر في قائمة الترجمة
-      updatedAt: Date.now() // 👈 ميزة تتبع زمن التعديل الأول لتحديد الأولويات بدقة
+      tagColor: '#FFF3B0',
+      updatedAt: Date.now()
     };
 
     setFolders(prev =>
@@ -1882,7 +1872,6 @@ export default function App() {
     addToast(`تم تكوين النمط "${name}" وتخزينه بنجاح`, 'success');
   };
 
-  // 👈 دالة حذف المجلد النشط وكل الأنماط بداخلها
   const handleDeleteFolder = (folderId: string) => {
     const target = folders.find(f => f.id === folderId);
     if (!target) return;
@@ -1893,15 +1882,12 @@ export default function App() {
     addToast(`✓ تم حذف المجلد "${target.name}" بنجاح`, 'success');
   };
 
-  // 👈 دالة حفظ وإعادة فرز النمط المعدل داخل المجلدات
   const handleSaveEditedStyle = (updatedStyle: TextStyle, targetFolderId: string) => {
     setFolders(prev => {
-      // إزالة النمط أولاً لتجنب التكرار
       const cleaned = prev.map(f => ({
         ...f,
         styles: f.styles.filter(s => s.id !== updatedStyle.id)
       }));
-      // إضافته للمجلد الجديد المختار
       return cleaned.map(f => {
         if (f.id !== targetFolderId) return f;
         return {
@@ -1914,7 +1900,6 @@ export default function App() {
     addToast('✓ تم حفظ التعديلات على النمط بنجاح', 'success');
   };
 
-  // 👈 دالة حذف نمط تنسيقي محدد
   const handleDeleteStyle = (styleId: string) => {
     const confirmDelete = window.confirm('هل أنت متأكد من حذف هذا النمط التنسيقي نهائياً؟');
     if (!confirmDelete) return;
@@ -1932,7 +1917,6 @@ export default function App() {
     addToast('✓ تم حذف النمط التنسيقي بنجاح', 'success');
   };
 
-  // 👈 فتح شاشة تعديل النمط وملء حقول النموذج بالقيم الحالية للنمط التنسيقي المختار
   const handleOpenEditStyle = (style: TextStyle, folderId: string) => {
     setEditingStyle({ style, folderId });
     setEditFormName(style.name);
@@ -1951,7 +1935,6 @@ export default function App() {
     setEditFormTagColor(style.tagColor || '#FFF3B0');
   };
 
-  // 👈 نسخ قيم تنسيق الطبقة النشطة بمسرح العمل ومطابقتها مباشرة في النموذج التفاعلي
   const handleCopyActiveLayerStyleToForm = () => {
     if (!activeLayer) {
       addToast('❌ حدد طبقة نصية نشطة في مسرح العمل أولاً لنسخ تنسيقها', 'error');
@@ -2090,7 +2073,6 @@ export default function App() {
     ctx.textAlign = style.textAlign || 'center';
     ctx.direction = 'rtl';
 
-    // تقسيم ورسم النص مع احترام الأسطر الفرعية ومحاذاة التسطير
     const rawLines = layer.text.split('\n');
     const lines: string[] = [];
     
@@ -2165,7 +2147,6 @@ export default function App() {
     ctx.textAlign = style.textAlign || 'center';
     ctx.direction = 'rtl';
 
-    // تقسيم ورسم النص مع احترام الأسطر الفرعية ومحاذاة التسطير
     const rawLines = layer.text.split('\n');
     const lines: string[] = [];
     
@@ -2392,7 +2373,6 @@ export default function App() {
         const dataUrl = canvas.toDataURL('image/png');
         const filename = `typer-translated-${pages[currentPageIndex]?.name || 'page'}.png`;
 
-        // 📱 تفعيل المشاركة الأصلية في حال كان التطبيق يعمل كـ APK على الهاتف
         if (Capacitor && Capacitor.isNativePlatform()) {
           try {
             if (!Filesystem || !Share || !Directory) {
@@ -2401,7 +2381,6 @@ export default function App() {
             }
             const base64Raw = dataUrl.split(',')[1] || dataUrl;
             
-            // كتابة الملف مؤقتاً في كاش الهاتف لتتمكن قائمة أندرويد من قراءته
             await Filesystem.writeFile({
               path: filename,
               data: base64Raw,
@@ -2413,13 +2392,11 @@ export default function App() {
               path: filename,
             });
 
-            // استدعاء شاشة المشاركة الأصلية للنظام لأي تطبيق آخر
             await Share.share({
               title: 'TypeR Studio - مشاركة ترجمة المانجا',
               files: [fileUriResult.uri],
             });
 
-            // تنظيف الملف المؤقت فور إتمام العملية
             await Filesystem.deleteFile({
               directory: Directory.Cache,
               path: filename,
@@ -2433,7 +2410,6 @@ export default function App() {
           return;
         }
 
-        // 🌐 العمل في وضع المتصفح العادي (Web Browser)
         const blob = dataURLtoBlob(dataUrl);
         const file = new File([blob], filename, { type: 'image/png' });
 
@@ -2768,8 +2744,6 @@ export default function App() {
       const lineText = line.text;
       const styleKey = line.styleKey;
 
-      // 🔍 البحث عن النمط المطابق للوسم (العلامة) الحالي لهذا السطر بالتحديد
-      let matchedStyle: TextStyle[] = [];
       let matchingStyles: TextStyle[] = [];
       
       folders.forEach(f => {
@@ -2785,14 +2759,12 @@ export default function App() {
         matchingStyles.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
         selectedStyle = matchingStyles[0];
       } else {
-        // إذا لم يطابق شيء، يتم البحث عن النمط الافتراضي style_normal
         folders.forEach(f => {
           const found = f.styles.find(s => s.id === 'style_normal');
           if (found) selectedStyle = found;
         });
       }
 
-      // استخراج خصائص النمط المطابق أو استخدام الخصائص العامة النشطة كبديل آمن
       const activeFontFamily = selectedStyle ? selectedStyle.fontFamily : fontFamily;
       const activeColor = selectedStyle ? selectedStyle.color : textColor;
       const activeFontSize = selectedStyle ? (selectedStyle.fontSize === 'auto' ? 'auto' : `${selectedStyle.fontSize}`) : fontSize;
@@ -2803,7 +2775,6 @@ export default function App() {
       const activeLineHeight = selectedStyle ? (selectedStyle.lineHeight || 1.25) : lineHeight;
       const activeTracking = selectedStyle ? selectedStyle.tracking : tracking;
 
-      // تحقق مما إذا كان هناك نمط مخصص مطابق (بخلاف النمط الافتراضي العام)
       const isCustomStyleMatched = selectedStyle && selectedStyle.id !== 'style_normal';
 
       const layStyle = {
@@ -2829,7 +2800,6 @@ export default function App() {
 
       let activeText = lineText;
       if (b.shape) {
-        // تطبيق الخطوط الافتراضية لشكل الفقاعة فقط إذا لم يتم التعرف على نمط مخصص (وسم) بالسطر
         if (!isCustomStyleMatched) {
           if (b.shape === 'narrative_box') {
             layStyle.fontFamily = 'Tahoma, sans-serif';
@@ -3103,14 +3073,12 @@ export default function App() {
     const imgW = imgEl.naturalWidth;
     const imgH = imgEl.naturalHeight;
 
-    // إنشاء كانفاس أسود مؤقت لتوليد القناع
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = imgW;
     maskCanvas.height = imgH;
     const mctx = maskCanvas.getContext('2d');
     if (!mctx) return null;
 
-    // ملء الخلفية باللون الأسود بالكامل (الأماكن المحفوظة)
     mctx.fillStyle = '#000000';
     mctx.fillRect(0, 0, imgW, imgH);
 
@@ -3118,21 +3086,19 @@ export default function App() {
     const mData = maskData.data;
     let hasDrawnOrSelectedPixels = false;
 
-    // 1. رسم وتجميع تحديد العصا السحرية الحالي داخل القناع باللون الأبيض في حال كان مفعلاً
     if (wandMask && wandMask.length === imgW * imgH) {
       for (let i = 0; i < wandMask.length; i++) {
         if (wandMask[i] === 1) {
           const pixelIdx = i * 4;
-          mData[pixelIdx] = 255;     // أحمر
-          mData[pixelIdx + 1] = 255; // أخضر
-          mData[pixelIdx + 2] = 255; // أزرق
-          mData[pixelIdx + 3] = 255; // ألفا (كامل الوضوح)
+          mData[pixelIdx] = 255;
+          mData[pixelIdx + 1] = 255;
+          mData[pixelIdx + 2] = 255;
+          mData[pixelIdx + 3] = 255;
           hasDrawnOrSelectedPixels = true;
         }
       }
     }
 
-    // 2. دمج ورسم ضربات فرشاة التبييض والتنظيف اليدوية الحالية على نفس القناع
     const cleaningCanvas = cleaningCanvasRef.current;
     if (cleaningCanvas) {
       const tempCtx = cleaningCanvas.getContext('2d');
@@ -3141,7 +3107,6 @@ export default function App() {
           const imgData = tempCtx.getImageData(0, 0, cleaningCanvas.width, cleaningCanvas.height);
           const data = imgData.data;
 
-          // التأكد من تطابق حجم لوحة التبييض مع الحجم الأصلي
           if (cleaningCanvas.width === imgW && cleaningCanvas.height === imgH) {
             for (let i = 0; i < data.length; i += 4) {
               const alpha = data[i + 3];
@@ -3161,7 +3126,6 @@ export default function App() {
       }
     }
 
-    // إذا لم يقم المستخدم بأي اختيار بالعصا أو رسم بالفرشاة، لا نرسل طلباً فارغاً
     if (!hasDrawnOrSelectedPixels) return null;
 
     mctx.putImageData(maskData, 0, 0);
@@ -3197,28 +3161,24 @@ export default function App() {
       return;
     }
 
-    // جلب المفاتيح النشطة للتبديل السحابي التلقائي
     const activeGeminiKey = geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
-    const activeHFToken = hfToken; // الرمز المخصص لـ Hugging Face
+    const activeHFToken = hfToken;
 
     if (!activeGeminiKey && !activeHFToken) {
       addToast('⚠️ يرجى إدخال مفتاح Gemini API Key أو Hugging Face Token في نافذة الإعدادات أولاً لتشغيل الممحاة الذكية', 'error');
-      setShowSettingsModal(true); // فتح الإعدادات تلقائياً للمستخدم
+      setShowSettingsModal(true);
       return;
     }
 
-    // تفضيل Gemini في حال توفره كخيار أول
     if (activeGeminiKey) {
       addToast('✨ جاري إرسال الطلب ومعالجة الصفحة بالذكاء الاصطناعي عبر Gemini... 🧠🎨', 'success');
 
       try {
-        // استيراد حزمة الـ SDK لـ Google GenAI ديناميكياً لتجنب المشاكل البرمجية أثناء الإقلاع
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
 
-        // استدعاء نموذج Gemini 2.5 Flash المعتمد لمعالجة وتعديل الصور
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image', // 👈 تم التغيير للنموذج البصري المخصص للصور
+          model: 'gemini-2.5-flash-image',
           contents: [
             {
               inlineData: {
@@ -3246,10 +3206,7 @@ export default function App() {
           const resultBase64 = part.inlineData.data;
           const resultDataUrl = `data:image/png;base64,${resultBase64}`;
 
-          // تحديث حالة الرسم وصورة التبييض للصفحة الحالية بالصورة النظيفة المولدة ذكياً
           handleUpdateCleaningDataUrl(resultDataUrl);
-          
-          // مسح قناع وتحديد العصا السحرية المنقط تلقائياً لراحة نظر المستخدم بعد نجاح المعالجة
           clearWandSelection();
 
           addToast('✓ تم تنظيف وإعادة رسم الخلفية بالذكاء الاصطناعي بنجاح! 🎉🎨', 'success');
@@ -3264,7 +3221,6 @@ export default function App() {
           errMsg = JSON.stringify(errMsg);
         }
         
-        // الكشف الذكي عن خطأ الحظر الجغرافي من Google لـ Egypt / Europe
         if (errMsg.includes("Image generation is not available") || errMsg.includes("FAILED_PRECONDITION")) {
           addToast('❌ حظر جغرافي من Google لخدمات الصور. يمكنك استخدام مفتاح Hugging Face كبديل مجاني ممتاز يعمل بدون VPN وبدون قيود سحابية!', 'error');
         } else {
@@ -3272,16 +3228,13 @@ export default function App() {
         }
       }
     } 
-    // التبديل التلقائي لـ Hugging Face السحابي المجاني الذي يعمل بكفاءة في مصر وكافة الدول بدون VPN
     else if (activeHFToken) {
       addToast('✨ جاري إرسال الطلب ومعالجة التبييض السحابي الحر عبر خوادم Hugging Face... 🧼🎨', 'success');
       try {
         let response;
-        // تم الاستبدال ليكون النموذج الأساسي RunwayML والاحتياطي المباشر في حال حدوث خطأ 500 هو Stability AI
         let hfUrl = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting";
 
         try {
-          // المحاولة الأولى: اتصال مباشر بخوادم Hugging Face
           const directUrl = `https://corsproxy.io/?${encodeURIComponent(hfUrl)}`;
           response = await fetch(directUrl, {
             method: "POST",
@@ -3301,7 +3254,6 @@ export default function App() {
             throw new Error(`HTTP ${response.status}`);
           }
         } catch (fetchErr) {
-          // المحاولة الثانية: في حال فشل النموذج الأول أو واجه ضغطاً (خطأ 500)، نتحول تلقائياً للنموذج الاحتياطي المستقر
           console.log("RunwayML inpainting failed, attempting fallback model stabilityai/stable-diffusion-2-inpainting...", fetchErr);
           
           hfUrl = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-inpainting";
@@ -3328,7 +3280,6 @@ export default function App() {
 
         const blob = await response.blob();
         
-        // تحويل ثنائي الصورة المستلمة لدمجها بالصفحة تلقائياً
         const reader = new FileReader();
         reader.readAsDataURL(blob);
         reader.onloadend = () => {
@@ -3355,7 +3306,6 @@ export default function App() {
       shape === 'narrative_box' ? 'صندوق مستطيل 📜' : 'بيضاوية رأسية 🔵'
     } 📐`, 'success');
 
-    // إذا كانت هناك طبقة نصوص نشطة ومحددة حالياً، نقوم بطلب إعادة تدوير والتفاف النص فوراً
     if (activeLayer) {
       const previousLayers = [...currentLayers];
       
@@ -3363,7 +3313,6 @@ export default function App() {
       const layerHeight = parseFloat(activeLayer.height) || 80;
 
       const opt = calculateOptimalFontSizeForShape(
-        // نزيل فواصل الأسطر الحالية لنعيد توزيع الكلمات بمرونة تامة مع الموازنة التلقائية
         activeLayer.text.replace(/\n/g, ' '),
         shape,
         layerWidth,
@@ -3372,7 +3321,7 @@ export default function App() {
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
         bubbleMargin,
-        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة النشطة
+        activeLayer.lineCountOverride
       );
 
       handleUpdateLayer(activeLayer.id, {
@@ -3450,7 +3399,6 @@ export default function App() {
                   e.stopPropagation();
                   if (!fallbackFile) return;
 
-                  // 📱 إذا كان يعمل كـ APK أصلي على الهاتف
                   if (Capacitor && Capacitor.isNativePlatform()) {
                     try {
                       if (!Filesystem || !Share || !Directory) {
@@ -3493,7 +3441,6 @@ export default function App() {
                     return;
                   }
 
-                  // 🌐 وضع المتصفح العادي (Fallback)
                   const file = new File([fallbackFile.blob], fallbackFile.filename, { type: fallbackFile.blob.type });
                   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     try {
@@ -4029,7 +3976,6 @@ export default function App() {
           mangaSrc={mangaSrc}
           activeTool={activeTool}
           setActiveTool={setActiveTool}
-          bubbleMargin={bubbleMargin}
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
@@ -4069,6 +4015,7 @@ export default function App() {
           watermarkSize={watermarkSize}
           onDuplicateLayer={handleDuplicateLayer}
           onSavePresetFromStyle={handleSavePresetFromStyle}
+          bubbleMargin={bubbleMargin}
         />
 
         {/* لوحة التحكم بالطبقات السفلية والتراجع */}
@@ -4164,6 +4111,18 @@ export default function App() {
         activePresetId={activePresetId}
         onApplyPreset={handleApplyPreset}
         onSaveCurrentPreset={handleSaveCurrentPreset}
+        onClearPreset={() => setActivePresetId(null)}
+        tatweelStrength={tatweelStrength}
+        setTatweelStrength={setTatweelStrength}
+        tatweelMargin={tatweelMargin}
+        setTatweelMargin={setTatweelMargin}
+        onApplyTatweel={handleApplyTatweel}
+        onUndoTatweel={handleUndoTatweel}
+        tatweelPreviewText={tatweelPreviewText}
+        onPrevLine={() => handleSelectLine(currentLineIndex - 1)}
+        onNextLine={() => handleSelectLine(currentLineIndex + 1)}
+        onInsertText={handleInsertText}
+        onAlignText={handleAlignText}
         onDrawingUndo={handleCleaningUndo}
         onDrawingRedo={handleCleaningRedo}
         canDrawingUndo={!!(history[currentPageIndex]?.undo && history[currentPageIndex].undo.length > 0)}
@@ -4173,8 +4132,8 @@ export default function App() {
         onAIInpaint={handleAIInpaint}
         detectedBubbleType={detectedBubbleType}
         onSelectBubbleShape={handleSelectBubbleShape}
-        onDeleteFolder={handleDeleteFolder} // 👈 ربط دالة حذف المجلدات
-        onEditStyle={handleOpenEditStyle} // 👈 ربط دالة فتح شاشة التعديل
+        onDeleteFolder={handleDeleteFolder}
+        onEditStyle={handleOpenEditStyle}
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -4187,7 +4146,7 @@ export default function App() {
         onOpenFontManager={() => setShowFontManager(true)}
       />
 
-      {/* 👈 نافذة تحرير وتعديل النمط التفاعلية الشاملة (Style Editing Modal) */}
+      {/* 👈 نافذة تحرير وتعديل النمط التفاعلية الشاملة */}
       {editingStyle && (
         <div className="fixed inset-0 bg-black/85 z-[100000] flex items-center justify-center p-4 backdrop-blur-xs select-none" dir="rtl">
           <div className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg p-5 w-full max-w-md text-right flex flex-col gap-4 max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -4411,7 +4370,7 @@ export default function App() {
                     italic: editFormItalic,
                     underline: editFormUnderline,
                     tagColor: editFormTagColor,
-                    updatedAt: editingStyle.style.updatedAt || Date.now() // 👈 الحفاظ على تاريخ التعديل الأول الأصلي
+                    updatedAt: editingStyle.style.updatedAt || Date.now()
                   };
                   handleSaveEditedStyle(formattedStyle, editFormFolderId);
                 }}
