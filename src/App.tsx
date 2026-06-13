@@ -40,6 +40,7 @@ import {
   tatweelLine,
   wrapTextToShape,
   calculateOptimalFontSizeForShape,
+  computeLayerBoundsFromWand,
   getFonts,
   saveFont,
   saveFavoriteFonts,
@@ -1344,18 +1345,17 @@ export default function App() {
     if (activeLayer && !multiBubbleMode) {
       const previousLayers = [...currentLayers];
       
-      const targetLeft = minX / scaleX;
-      const targetTop = minY / scaleY;
-      const targetW = foundW / scaleX;
-      const targetH = foundH / scaleY;
-
-      const marginRatio = bubbleMargin / 100;
-      const padX = targetW * marginRatio;
-      const padY = targetH * marginRatio;
-      const layerLeft = targetLeft + padX;
-      const layerTop = targetTop + padY;
-      const layerWidth = Math.max(20, targetW - padX * 2);
-      const layerHeight = Math.max(20, targetH - padY * 2);
+      // استخدام الحساب الدقيق من utils لضمان اتساق المساحات الهندسية للفقاعة
+      const { left: layerLeft, top: layerTop, width: layerWidth, height: layerHeight } =
+        computeLayerBoundsFromWand({
+          bboxX: minX,
+          bboxY: minY,
+          bboxW: foundW,
+          bboxH: foundH,
+          scaleX,
+          scaleY,
+          marginPercent: bubbleMargin,
+        });
 
       const opt = calculateOptimalFontSizeForShape(
         // إزالة فواصل الأسطر لتوزيع الكلمات ديناميكياً بدقة
@@ -1514,13 +1514,31 @@ export default function App() {
       targetHeight = selectionBox.height;
     }
 
-    const marginRatio = bubbleMargin / 100;
-    const padX = targetWidth * marginRatio;
-    const padY = targetHeight * marginRatio;
-    const layerLeft = targetLeft + padX;
-    const layerTop = targetTop + padY;
-    const layerWidth = Math.max(20, targetWidth - padX * 2);
-    const layerHeight = Math.max(20, targetHeight - padY * 2);
+    let layerLeft: number, layerTop: number, layerWidth: number, layerHeight: number;
+
+    if (hasWand && wandDimensions) {
+      const bounds = computeLayerBoundsFromWand({
+        bboxX: wandDimensions.x,
+        bboxY: wandDimensions.y,
+        bboxW: wandDimensions.w,
+        bboxH: wandDimensions.h,
+        scaleX,
+        scaleY,
+        marginPercent: bubbleMargin,
+      });
+      layerLeft   = bounds.left;
+      layerTop    = bounds.top;
+      layerWidth  = bounds.width;
+      layerHeight = bounds.height;
+    } else {
+      const marginRatio = bubbleMargin / 100;
+      const padX = targetWidth * marginRatio;
+      const padY = targetHeight * marginRatio;
+      layerLeft   = targetLeft + padX;
+      layerTop    = targetTop  + padY;
+      layerWidth  = Math.max(20, targetWidth  - padX * 2);
+      layerHeight = Math.max(20, targetHeight - padY * 2);
+    }
 
     const rawTxt = parsedLines[currentLineIndex].text;
     let txt = rawTxt;
@@ -1632,14 +1650,31 @@ export default function App() {
 
     const previousLayers = [...currentLayers];
 
-    // تطبيق هوامش الأمان للفقاعة
-    const marginRatio = bubbleMargin / 100;
-    const padX = targetW * marginRatio;
-    const padY = targetH * marginRatio;
-    const layerLeft = targetLeft + padX;
-    const layerTop = targetTop + padY;
-    const layerWidth = Math.max(20, targetW - padX * 2);
-    const layerHeight = Math.max(20, targetH - padY * 2);
+    let layerLeft: number, layerTop: number, layerWidth: number, layerHeight: number;
+
+    if (isWandAlign && wandDimensions) {
+      const bounds = computeLayerBoundsFromWand({
+        bboxX: wandDimensions.x,
+        bboxY: wandDimensions.y,
+        bboxW: wandDimensions.w,
+        bboxH: wandDimensions.h,
+        scaleX,
+        scaleY,
+        marginPercent: bubbleMargin,
+      });
+      layerLeft   = bounds.left;
+      layerTop    = bounds.top;
+      layerWidth  = bounds.width;
+      layerHeight = bounds.height;
+    } else {
+      const marginRatio = bubbleMargin / 100;
+      const padX = targetW * marginRatio;
+      const padY = targetH * marginRatio;
+      layerLeft   = targetLeft + padX;
+      layerTop    = targetTop  + padY;
+      layerWidth  = Math.max(20, targetW - padX * 2);
+      layerHeight = Math.max(20, targetH - padY * 2);
+    }
 
     let optSize = parseFloat(activeLayer.style.fontSize) || 16;
     let newText = activeLayer.text;
@@ -2813,13 +2848,16 @@ export default function App() {
         bgColor: 'transparent',
       };
 
-      const marginRatio = bubbleMargin / 100;
-      const padX = (b.bboxW / b.scaleX) * marginRatio;
-      const padY = (b.bboxH / b.scaleY) * marginRatio;
-      const layerLeft = b.bboxX / b.scaleX + padX;
-      const layerTop = b.bboxY / b.scaleY + padY;
-      const layerWidth = Math.max(20, b.bboxW / b.scaleX - padX * 2);
-      const layerHeight = Math.max(20, b.bboxH / b.scaleY - padY * 2);
+      const { left: layerLeft, top: layerTop, width: layerWidth, height: layerHeight } =
+        computeLayerBoundsFromWand({
+          bboxX: b.bboxX,
+          bboxY: b.bboxY,
+          bboxW: b.bboxW,
+          bboxH: b.bboxH,
+          scaleX: b.scaleX,
+          scaleY: b.scaleY,
+          marginPercent: bubbleMargin,
+        });
 
       let activeText = lineText;
       if (b.shape) {
@@ -3606,7 +3644,7 @@ export default function App() {
                           checkedStylesForExport(prev => [...prev, s.id]);
                         }
                       }}
-                      className="accent-[#007acc] shrink-0"
+                      className="accent-[#007acc]"
                     />
                     <span className="text-gray-300 truncate">{s.name}</span>
                   </label>
@@ -4457,3 +4495,4 @@ export default function App() {
     </div>
   );
 }
+
