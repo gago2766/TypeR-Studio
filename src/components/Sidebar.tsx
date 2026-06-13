@@ -10,14 +10,14 @@ interface SidebarProps {
   onExportAllZip: () => void;
   onSaveState: () => void;
   onLoadState: () => void;
-  onShare: () => void; // 👈 إضافة الخاصية إلى واجهة المكون
+  onShare: () => void;
 
   // Tool Selection
   activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand';
   setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void;
   wandTolerance: number;
 
-  // New cleaning & redrawing props
+  // Cleaning & redrawing props
   brushColor: string;
   setBrushColor: (val: string) => void;
   brushSize: number;
@@ -102,7 +102,7 @@ interface SidebarProps {
   hasWandMask?: boolean;
   onAIInpaint?: () => void;
 
-  // 📐 إضافة ميزات التحكم وتحديد شكل الفقاعة يدوياً وتلقائياً لمطابقة صورك بدقة
+  // Bubble Shape Matching
   detectedBubbleType: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null;
   onSelectBubbleShape: (shape: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval') => void;
 
@@ -112,9 +112,13 @@ interface SidebarProps {
   onInsertText: () => void;
   onAlignText: () => void;
 
-  // 👈 سنقوم باستقبال البروبات المضافة هنا لحذف المجلدات وتحرير الأنماط يدوياً
+  // Folder and Style modifications
   onDeleteFolder?: (folderId: string) => void;
   onEditStyle?: (style: TextStyle, folderId: string) => void;
+
+  // 📏 خيارات هامش الأمان الإضافية
+  bubbleMargin?: number;
+  setBubbleMargin?: (val: number) => void;
 }
 
 export function Sidebar({
@@ -204,9 +208,10 @@ export function Sidebar({
   onAIInpaint,
   detectedBubbleType,
   onSelectBubbleShape,
-  // 👈 فك حزمة المتغيرات البرمجية المضافة حديثاً
   onDeleteFolder,
   onEditStyle,
+  bubbleMargin = 10,
+  setBubbleMargin,
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -290,7 +295,7 @@ export function Sidebar({
           </button>
           <button
             onClick={onExportAllZip}
-            className="bg-[#d27d2d] text-white hover:bg-[#b0631e] text-[11px] font-semibold py-2 px-1 rounded transition select-none truncate flex items-center justify-center gap-1 cursor-pointer"
+            className="bg-[#d27d2d] text-white hover:bg-[#d27d2d] text-[11px] font-semibold py-2 px-1 rounded transition select-none truncate flex items-center justify-center gap-1 cursor-pointer"
             id="export-zip-btn"
             title="تصدير وضغط جميع الصفحات في ملف ZIP واحد"
           >
@@ -985,6 +990,34 @@ export function Sidebar({
           >
             تطبيق التنسيق على العنصر المحدد
           </button>
+
+          {/* 📏 خيار إعدادات الهامش التفاعلي الجديد بـ 3 خيارات */}
+          {setBubbleMargin !== undefined && (
+            <div className="flex flex-col gap-2 border-t border-[#2d2d2d] pt-3 mt-1">
+              <span className="text-[10px] text-gray-400 font-bold">هامش أمان أسطر الفقاعة:</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { val: 5,  label: '5% ضيق' },
+                  { val: 10, label: '10% متوسط' },
+                  { val: 15, label: '15% واسع' },
+                ].map(({ val, label }) => (
+                  <label key={val} className="flex items-center gap-1 justify-center cursor-pointer bg-[#1e1e1e] border border-[#2d2d2d] rounded px-1.5 py-1 hover:border-[#007acc] transition">
+                    <input
+                      type="radio"
+                      name="sidebar_bubble_margin_setting"
+                      checked={bubbleMargin === val}
+                      onChange={() => {
+                        setBubbleMargin(val);
+                      }}
+                      className="accent-[#007acc] scale-90"
+                    />
+                    <span className="text-[9.5px] text-gray-300 font-semibold">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Shape Presets */}
@@ -1000,7 +1033,7 @@ export function Sidebar({
                   key={p.id}
                   onClick={() => onApplyPreset(p.id)}
                   className={`p-1 bg-[#1e1e1e] border rounded cursor-pointer text-center text-[10px] flex flex-col items-center gap-1 transition ${
-                    isActive ? 'border-[#007acc] bg-[#0d2233] text-white' : 'border-[#333] hover:border-[#007acc]'
+                    isActive ? 'border-[#007acc] bg-[#0d2233] text-white font-bold' : 'border-[#333] hover:border-[#007acc]'
                   }`}
                 >
                   <div
@@ -1023,14 +1056,14 @@ export function Sidebar({
           <div className="flex gap-1.5 mt-1.5">
             <button
               onClick={onSaveCurrentPreset}
-              className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow transition truncate"
+              className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow transition truncate font-bold cursor-pointer"
               id="save-preset-btn"
             >
               💾 حفظ النمط الحالي
             </button>
             <button
               onClick={onClearPreset}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] rounded shrink-0 p-1 w-8 flex items-center justify-center text-xs"
+              className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] rounded shrink-0 p-1 w-8 flex items-center justify-center text-xs cursor-pointer"
               id="clear-preset-btn"
               title="إلغاء التحديد"
             >
@@ -1053,7 +1086,7 @@ export function Sidebar({
                 max="5"
                 value={tatweelStrength}
                 onChange={e => setTatweelStrength(parseInt(e.target.value) || 2)}
-                className="flex-1 accent-[#007acc] focus:outline-none"
+                className="flex-1 accent-[#007acc] focus:outline-none cursor-pointer"
                 id="tatweel-strength"
               />
               <span className="text-[10px] text-gray-300 w-5 text-left shrink-0">{tatweelStrength}</span>
@@ -1067,7 +1100,7 @@ export function Sidebar({
                 max="30"
                 value={tatweelMargin}
                 onChange={e => setTatweelMargin(parseInt(e.target.value) || 5)}
-                className="flex-1 accent-[#007acc] focus:outline-none"
+                className="flex-1 accent-[#007acc] focus:outline-none cursor-pointer"
                 id="tatweel-margin"
               />
               <span className="text-[10px] text-gray-300 w-6 text-left shrink-0">{tatweelMargin}%</span>
@@ -1084,14 +1117,14 @@ export function Sidebar({
             <div className="flex gap-1.5">
               <button
                 onClick={onApplyTatweel}
-                className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow font-medium transition"
+                className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow font-medium transition cursor-pointer"
                 id="tatweel-apply-btn"
               >
                 تطبيق ـ التمطيط
               </button>
               <button
                 onClick={onUndoTatweel}
-                className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] rounded shrink-0 p-1 w-8 flex items-center justify-center text-xs font-semibold"
+                className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] rounded shrink-0 p-1 w-8 flex items-center justify-center text-xs font-semibold cursor-pointer"
                 id="tatweel-undo-btn"
                 title="تراجع"
               >
@@ -1107,14 +1140,14 @@ export function Sidebar({
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={onPrevLine}
-            className="bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-white text-[11px] py-1.5 rounded transition select-none"
+            className="bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-white text-[11px] py-1.5 rounded transition select-none cursor-pointer font-bold"
             id="prev-line-btn"
           >
             السطر السابق ⇧
           </button>
           <button
             onClick={onNextLine}
-            className="bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-white text-[11px] py-1.5 rounded transition select-none"
+            className="bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-white text-[11px] py-1.5 rounded transition select-none cursor-pointer font-bold"
             id="next-line-btn"
           >
             السطر التالي ⇩
@@ -1123,14 +1156,14 @@ export function Sidebar({
         <div className="grid grid-cols-3 gap-1.5">
           <button
             onClick={onInsertText}
-            className="col-span-2 bg-[#007acc] hover:bg-[#0062a3] text-white font-medium text-[11px] py-1.5 rounded shadow transition select-none"
+            className="col-span-2 bg-[#007acc] hover:bg-[#0062a3] text-white font-bold text-[11px] py-1.5 rounded shadow transition select-none cursor-pointer"
             id="paste-btn"
           >
             إدراج النص [Enter]
           </button>
           <button
             onClick={onAlignText}
-            className="col-span-1 bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-gray-300 text-[11px] py-1.5 rounded transition select-none truncate"
+            className="col-span-1 bg-[#2d2d2d] border border-[#3c3c3c] hover:bg-[#3d3d3d] text-gray-300 text-[11px] py-1.5 rounded transition select-none truncate cursor-pointer font-bold"
             id="align-btn"
             title="محاذاة [Ctrl+A]"
           >
