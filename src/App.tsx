@@ -30,7 +30,6 @@ import {
   TextStyle, 
   StyleFolder, 
   ProcessedLine, 
-  ShapePreset, 
   CustomFont 
 } from './types';
 
@@ -52,8 +51,6 @@ import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { LayersPanel } from './components/LayersPanel';
 import { Workspace } from './components/Workspace';
-import { writePsd } from 'ag-psd';
-import JSZip from 'jszip';
 
 // 📱 تعريف متغيرات Capacitor بشكل ديناميكي لتجنب أخطاء البناء في بيئات الويب وCI/CD
 let Capacitor: any = null;
@@ -96,13 +93,6 @@ const INITIAL_FOLDERS: StyleFolder[] = [
       { id: "style_scream", name: "صراخ غاضب", fontSize: "auto", color: "#e81123", bgColor: "transparent", tracking: 1, lineHeight: 1.1, textAlign: "center", fontFamily: "Impact, sans-serif", tags: ["s", "scream"], enabled: true, tagColor: "#FADBD8", updatedAt: 3 }
     ]
   }
-];
-
-const INITIAL_PRESETS: ShapePreset[] = [
-  { id: 'p1', name: 'عادي', color: '#000000', bg: 'transparent', font: 'Tahoma, sans-serif', size: 'auto', bold: false, italic: false, align: 'center', lh: 1.3, tracking: 0 },
-  { id: 'p2', name: 'صراخ', color: '#000000', bg: 'transparent', font: 'Impact, sans-serif', size: 'auto', bold: true, italic: false, align: 'center', lh: 1.15, tracking: 1 },
-  { id: 'p3', name: 'تفكير', color: '#333333', bg: 'transparent', font: 'Tahoma, sans-serif', size: 'auto', bold: false, italic: true, align: 'center', lh: 1.3, tracking: 0 },
-  { id: 'p4', name: 'ناعم', color: '#1a1a6e', bg: 'transparent', font: "'Times New Roman', serif", size: 'auto', bold: false, italic: false, align: 'center', lh: 1.4, tracking: 0 },
 ];
 
 const DEFAULT_MANGA_SRC = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='800' style='background:%23222'><text x='50%' y='50%' fill='%23666' text-anchor='middle' font-family='sans-serif'>قم بسحب أو رفع صور الصفحات للبدء</text></svg>`;
@@ -240,10 +230,6 @@ export default function App() {
   useEffect(() => {
     saveFavoriteFonts(favFonts);
   }, [favFonts]);
-
-  // قوالب الأشكال الجاهزة
-  const [presets, setPresets] = useState<ShapePreset[]>(INITIAL_PRESETS);
-  const [activePresetId, setActivePresetId] = useState<string | null>(null);
 
   // معايير التمطيط والكشيدة العربية
   const [tatweelStrength, setTatweelStrength] = useState<number>(2);
@@ -544,7 +530,7 @@ export default function App() {
     }
   };
 
-  // مزامنة المتغيرات والأنماط بناءً على التغيير في التنسيق المحدد
+  // مزامنة المتغير والأنماط بناءً على التغيير في التنسيق المحدد
   useEffect(() => {
     let style: TextStyle | null = null;
     folders.forEach(f => {
@@ -701,28 +687,6 @@ export default function App() {
     pushToHistory(previousLayers);
     setActiveLayer(newLayer);
     addToast('✓ تم تكرار صندوق النص الحالي وتحديده بنجاح 📋', 'success');
-  };
-
-  const handleSavePresetFromStyle = (style: any) => {
-    const name = prompt('أدخل اسم النمط الجديد لحفظه في القوالب:');
-    if (!name) return;
-
-    const newPreset: ShapePreset = {
-      id: `p_${Date.now()}`,
-      name,
-      color: style.color || '#000000',
-      bg: style.bgColor || 'transparent',
-      font: style.fontFamily || 'Inter',
-      size: !style.fontSize ? 'auto' : (parseFloat(style.fontSize) || 16),
-      bold: style.fontWeight === 'bold',
-      italic: style.fontStyle === 'italic',
-      align: style.textAlign || 'center',
-      lh: style.lineHeight || 1.3,
-      tracking: parseFloat(style.letterSpacing) || 0,
-    };
-
-    setPresets(prev => [...prev, newPreset]);
-    addToast('✓ أضيف نمط القالب الخاص بك بنجاح', 'success');
   };
 
   // 💾 التراجع الموحد والكامل للطبقات وتبييض الرسم معاً
@@ -1536,7 +1500,7 @@ export default function App() {
       const padY = targetHeight * marginRatio;
       layerLeft   = targetLeft + padX;
       layerTop    = targetTop  + padY;
-      layerWidth  = Math.max(20, targetWidth  - padX * 2);
+      layerWidth = Math.max(20, targetWidth  - padX * 2);
       layerHeight = Math.max(20, targetHeight - padY * 2);
     }
 
@@ -1783,77 +1747,6 @@ export default function App() {
     addToast('تراجع عن تمطيط الأسطر');
   };
 
-  // تطبيق القوالب المنسقة مسبقاً
-  const handleApplyPreset = (pId: string) => {
-    const preset = presets.find(x => x.id === pId);
-    if (!preset) return;
-
-    setActivePresetId(pId);
-    setFontSize(preset.size === 'auto' ? 'auto' : `${preset.size}`);
-    setTextColor(preset.color);
-    setBgTransparent(preset.bg === 'transparent');
-    setBgColor(preset.bg === 'transparent' ? '#ffffff' : preset.bg);
-    setFontFamily(preset.font);
-    setBold(preset.bold);
-    setItalic(preset.italic);
-    setLineHeight(preset.lh);
-    setTracking(preset.tracking);
-    setTextAlign(preset.align);
-
-    if (activeLayer) {
-      const prevLayers = [...currentLayers];
-      const optFs = preset.size === 'auto' 
-        ? calculateOptimalFontSize(
-            activeLayer.text, 
-            parseFloat(activeLayer.width) || 120, 
-            parseFloat(activeLayer.height) || 80, 
-            preset.font, 
-            preset.lh, 
-            preset.tracking
-          ) 
-        : preset.size;
-
-      handleUpdateLayer(activeLayer.id, {
-        style: {
-          fontSize: `${optFs}px`,
-          color: preset.color,
-          fontFamily: preset.font,
-          fontWeight: preset.bold ? 'bold' : 'normal',
-          fontStyle: preset.italic ? 'italic' : 'normal',
-          textDecoration: 'none',
-          textAlign: preset.align,
-          lineHeight: preset.lh,
-          letterSpacing: `${preset.tracking}px`,
-          bgColor: preset.bg,
-        }
-      });
-      pushToHistory(prevLayers);
-    }
-    addToast(`تم تطبيق نمط الشكل: ${preset.name}`);
-  };
-
-  const handleSaveCurrentPreset = () => {
-    const name = prompt('أدخل اسم النمط الجديد لحفظه في القوالب:');
-    if (!name) return;
-
-    const newPreset: ShapePreset = {
-      id: `p_${Date.now()}`,
-      name,
-      color: textColor,
-      bg: bgTransparent ? 'transparent' : bgColor,
-      font: fontFamily,
-      size: fontSize === 'auto' ? 'auto' : parseFloat(fontSize),
-      bold: bold,
-      italic: italic,
-      align: textAlign,
-      lh: lineHeight,
-      tracking: tracking,
-    };
-
-    setPresets(prev => [...prev, newPreset]);
-    addToast('✓ أضيف نمط القالب الخاص بك بنجاح', 'success');
-  };
-
   // إدارة وهيكلة مجلدات الأنماط
   const handleAddFolder = () => {
     const name = prompt('أدخل اسم المجلد الإداري الجديد للأنماط:');
@@ -2078,90 +1971,6 @@ export default function App() {
 
     pushToHistory(prevLayers);
     addToast('تم تطبيق كامل إعدادات النمط بنجاح', 'success');
-  };
-
-  // محاكاة تمثيل طبقات النصوص على كائن Canvas مستقل (مفيد لـ PSD) - تم تحديثه لاحترام فواصل الأسطر \n
-  const renderLayerToSeparateCanvas = (
-    layer: MangaLayer,
-    scaleX: number,
-    scaleY: number
-  ) => {
-    const left = parseFloat(layer.left) * scaleX;
-    const top = parseFloat(layer.top) * scaleY;
-    const width = parseFloat(layer.width) * scaleX;
-    const height = parseFloat(layer.height) * scaleY;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width));
-    canvas.height = Math.max(1, Math.round(height));
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      return { canvas, left: Math.round(left), top: Math.round(top) };
-    }
-
-    const style = layer.style;
-    const fs = (parseFloat(style.fontSize) || 16) * scaleY;
-    const col = style.color || '#000000';
-    const bgCol = style.bgColor || 'transparent';
-
-    ctx.save();
-    if (bgCol !== 'transparent' && bgCol !== 'rgba(0,0,0,0)' && bgCol !== 'rgba(0, 0, 0, 0)') {
-      ctx.fillStyle = bgCol;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    ctx.fillStyle = col;
-    const fWeight = style.fontWeight || 'normal';
-    const fStyle = style.fontStyle || 'normal';
-    ctx.font = `${fStyle} ${fWeight} ${fs}px ${style.fontFamily}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = style.textAlign || 'center';
-    ctx.direction = 'rtl';
-
-    // تقسيم ورسم النص مع احترام الأسطر الفرعية ومحاذاة التسطير
-    const rawLines = layer.text.split('\n');
-    const lines: string[] = [];
-    
-    rawLines.forEach(rawLine => {
-      const words = rawLine.split(' ');
-      let currentLine = '';
-      for (let n = 0; n < words.length; n++) {
-        const word = words[n];
-        if (!word && n > 0) continue;
-        const test = currentLine ? currentLine + ' ' + word : word;
-        if (ctx.measureText(test).width > width && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = test;
-        }
-      }
-      if (currentLine) {
-        lines.push(currentLine);
-      } else if (rawLine === '') {
-        lines.push('');
-      }
-    });
-
-    const lineH = fs * (style.lineHeight || 1.25);
-    const totalH = lines.length * lineH;
-    const startY = (height - totalH) / 2 + lineH / 2;
-    const xPos = style.textAlign === 'right' ? width - 4
-               : style.textAlign === 'left'  ? 4
-               : width / 2;
-
-    lines.forEach((lineVal, idx) => {
-      if (style.textDecoration === 'underline') {
-        const metrics = ctx.measureText(lineVal);
-        const ux = style.textAlign === 'center' ? xPos - metrics.width / 2 : xPos;
-        ctx.fillRect(ux, startY + idx * lineH + fs * 0.55, metrics.width, Math.max(1, fs * 0.07));
-      }
-      ctx.fillText(lineVal, xPos, startY + idx * lineH);
-    });
-
-    ctx.restore();
-    return { canvas, left: Math.round(left), top: Math.round(top) };
   };
 
   // محاكاة تمثيل طبقات النصوص على كائن Canvas مباشر للتصدير - تم تحديثه لاحترام فواصل الأسطر \n
@@ -2486,228 +2295,6 @@ export default function App() {
     });
   };
 
-  // تصدير الصفحة النشطة كملف فوتوشوب PSD
-  const handleExportPSD = () => {
-    const imgEl = document.getElementById('manga-img') as HTMLImageElement;
-    if (!imgEl || !imgEl.naturalWidth || pages.length === 0) {
-      addToast('لا تتوفر صفحة مانجا نشطة لتصديرها', 'error');
-      return;
-    }
-
-    addToast('جاري تصدير الصفحة بصيغة PSD الفوتوشوب مع الطبقات...', 'success');
-
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = imgEl.naturalWidth;
-    bgCanvas.height = imgEl.naturalHeight;
-    const bgCtx = bgCanvas.getContext('2d');
-    if (!bgCtx) return;
-
-    bgCtx.drawImage(imgEl, 0, 0);
-
-    const cleaningCanvas = cleaningCanvasRef.current;
-    if (cleaningCanvas) {
-      bgCtx.drawImage(cleaningCanvas, 0, 0);
-    }
-
-    const scaleX = imgEl.naturalWidth / imgEl.offsetWidth;
-    const scaleY = imgEl.naturalHeight / imgEl.offsetHeight;
-
-    const runPSDExport = () => {
-      const children: any[] = [];
-
-      children.push({
-        name: 'خلفية الصفحة (Background)',
-        canvas: bgCanvas,
-      });
-
-      currentLayers.forEach((l, index) => {
-        if (l.hidden) return;
-        const layerData = renderLayerToSeparateCanvas(l, scaleX, scaleY);
-        
-        children.push({
-          name: `النص ${index + 1}: ${l.text.substring(0, 20)}${l.text.length > 20 ? '...' : ''}`,
-          canvas: layerData.canvas,
-          left: layerData.left,
-          top: layerData.top,
-          text: {
-            text: l.text,
-            style: {
-              fontSize: (parseFloat(l.style.fontSize) || 16) * scaleY,
-            }
-          }
-        });
-      });
-
-      const psdData = {
-        width: imgEl.naturalWidth,
-        height: imgEl.naturalHeight,
-        children: children,
-      };
-
-      try {
-        const buffer = writePsd(psdData);
-        const blob = new Blob([buffer], { type: 'application/x-photoshop' });
-        const safeName = (pages[currentPageIndex]?.name || 'page').replace(/\.[^.]+$/, '');
-        triggerDownload(blob, `typer-translated-${safeName}.psd`);
-      } catch (err: any) {
-        console.error(err);
-        addToast('خطأ أثناء كتابة ملف الـ PSD، يرجى إعادة المحاولة', 'error');
-      }
-    };
-
-    drawWatermarkToCanvas(bgCtx, bgCanvas.width, bgCanvas.height, runPSDExport);
-  };
-
-  // تصدير وضغط جميع الصفحات بملف ZIP واحد
-  const handleExportAllZip = () => {
-    if (pages.length === 0) {
-      addToast('لا توجد صفحات مضافة لتصديرها كـ ZIP', 'error');
-      return;
-    }
-
-    addToast('📦 جاري معالجة وتجميع كل الصفحات في ملف ZIP مضغوط واحد...', 'success');
-
-    const zip = new JSZip();
-    let progressIdx = 0;
-
-    const triggerNext = () => {
-      if (progressIdx >= pages.length) {
-        zip.generateAsync({ type: 'blob' }).then((blob) => {
-          const cleanDate = new Date().toISOString().slice(0, 10);
-          triggerDownload(blob, `typer-manga-pack-${cleanDate}.zip`);
-        }).catch((err) => {
-          console.error(err);
-          addToast('حدث خطأ أثناء ضغط الملفات، يرجى تكرار المحاولة', 'error');
-        });
-        return;
-      }
-
-      const pState = pages[progressIdx];
-      const exportImg = new Image();
-      exportImg.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = exportImg.naturalWidth;
-        canvas.height = exportImg.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          progressIdx++;
-          setTimeout(triggerNext, 10);
-          return;
-        }
-
-        ctx.drawImage(exportImg, 0, 0);
-
-        const imgEl = document.getElementById('manga-img') as HTMLImageElement;
-        const dispW = imgEl?.offsetWidth || 600;
-        const dispH = imgEl?.offsetHeight || 800;
-
-        const scaleX = exportImg.naturalWidth / dispW;
-        const scaleY = exportImg.naturalHeight / dispH;
-
-        const finishPageExport = () => {
-          pState.layers.forEach(l => {
-            if (!l.hidden) renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY);
-          });
-
-          drawWatermarkToCanvas(ctx, canvas.width, canvas.height, () => {
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const padIndex = String(progressIdx + 1).padStart(3, '0');
-                const cleanPageName = pState.name.replace(/\.[^.]+$/, '');
-                zip.file(`${padIndex}_${cleanPageName}.png`, blob);
-              }
-              progressIdx++;
-              setTimeout(triggerNext, 120);
-            }, 'image/png');
-          });
-        };
-
-        const cleaningUrl = pState.cleaningDataUrl;
-        if (cleaningUrl) {
-          const cleaningImg = new Image();
-          cleaningImg.onload = () => {
-            ctx.drawImage(cleaningImg, 0, 0);
-            finishPageExport();
-          };
-          cleaningImg.src = cleaningUrl;
-        } else {
-          finishPageExport();
-        }
-      };
-      exportImg.src = pState.src;
-    };
-
-    triggerNext();
-  };
-
-  // تصدير جميع الصفحات منفصلة
-  const handleExportAll = () => {
-    if (pages.length === 0) {
-      addToast('لا توجد صفحات مضافة لتصديرها', 'error');
-      return;
-    }
-
-    let progressIdx = 0;
-    addToast('بدء تصدير جميع دفعة الصفحات...', 'success');
-
-    const triggerNext = () => {
-      if (progressIdx >= pages.length) {
-        addToast(`✓ تم الانتهاء من التصدير بالكامل! (${pages.length} صفحة)`, 'success');
-        return;
-      }
-
-      const pState = pages[progressIdx];
-      const exportImg = new Image();
-      exportImg.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = exportImg.naturalWidth;
-        canvas.height = exportImg.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        ctx.drawImage(exportImg, 0, 0);
-
-        const imgEl = document.getElementById('manga-img') as HTMLImageElement;
-        const dispW = imgEl?.offsetWidth || 600;
-        const dispH = imgEl?.offsetHeight || 800;
-
-        const scaleX = exportImg.naturalWidth / dispW;
-        const scaleY = exportImg.naturalHeight / dispH;
-
-        const finishPageExport = () => {
-          pState.layers.forEach(l => {
-            if (!l.hidden) renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY);
-          });
-
-          drawWatermarkToCanvas(ctx, canvas.width, canvas.height, () => {
-            canvas.toBlob((blob) => {
-              if (blob) {
-                triggerDownload(blob, pState.name.replace(/\.[^.]+$/, '') + '-translated.png');
-              }
-              progressIdx++;
-              setTimeout(triggerNext, 350);
-            }, 'image/png');
-          });
-        };
-
-        const cleaningUrl = pState.cleaningDataUrl;
-        if (cleaningUrl) {
-          const cleaningImg = new Image();
-          cleaningImg.onload = () => {
-            ctx.drawImage(cleaningImg, 0, 0);
-            finishPageExport();
-          };
-          cleaningImg.src = cleaningUrl;
-        } else {
-          finishPageExport();
-        }
-      };
-      exportImg.src = pState.src;
-    };
-
-    triggerNext();
-  };
-
   // حفظ واستعادة تقدم وحالة المحرر
   const handleSaveState = () => {
     const stripPages = pages.map(p => ({
@@ -2721,7 +2308,6 @@ export default function App() {
       scriptInput,
       customFonts: customFonts.map(f => ({ name: f.name, value: f.value })),
       favFonts,
-      presets,
       watermarkEnabled,
       watermarkType,
       watermarkText,
@@ -2752,7 +2338,6 @@ export default function App() {
       if (pkg.folders) setFolders(pkg.folders);
       if (pkg.scriptInput) setScriptInput(pkg.scriptInput);
       if (pkg.favFonts) setFavFonts(pkg.favFonts);
-      if (pkg.presets) setPresets(pkg.presets);
 
       if (pkg.watermarkEnabled !== undefined) setWatermarkEnabled(pkg.watermarkEnabled);
       if (pkg.watermarkType !== undefined) setWatermarkType(pkg.watermarkType);
@@ -4083,7 +3668,7 @@ export default function App() {
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={setActiveLayer}
+          onSetActiveLayer={onSetActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onAddSelectionBounds={(bounds) => {
             setSelectionBox({
@@ -4118,14 +3703,13 @@ export default function App() {
           watermarkPosition={watermarkPosition}
           watermarkSize={watermarkSize}
           onDuplicateLayer={handleDuplicateLayer}
-          onSavePresetFromStyle={handleSavePresetFromStyle}
         />
 
         {/* لوحة التحكم بالطبقات السفلية والتراجع */}
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={setActiveLayer}
+          onSetActiveLayer={onSetActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
@@ -4151,9 +3735,6 @@ export default function App() {
       <Sidebar
         onImageUpload={handleImageUpload}
         onExportPNG={handleExportPNG}
-        onExportPSD={handleExportPSD}
-        onExportAll={handleExportAll}
-        onExportAllZip={handleExportAllZip}
         onSaveState={handleSaveState}
         onLoadState={handleRestoreState}
         onShare={handleShare}
@@ -4210,11 +3791,6 @@ export default function App() {
         setFavFonts={setFavFonts}
         onOpenFontManager={() => setShowFontManager(true)}
         onApplyStyleToActiveLayer={handleApplyStyleToActiveLayer}
-        presets={presets}
-        activePresetId={activePresetId}
-        onApplyPreset={handleApplyPreset}
-        onSaveCurrentPreset={handleSaveCurrentPreset}
-        onClearPreset={() => setActivePresetId(null)}
         tatweelStrength={tatweelStrength}
         setTatweelStrength={setTatweelStrength}
         tatweelMargin={tatweelMargin}
@@ -4495,4 +4071,3 @@ export default function App() {
     </div>
   );
 }
-
