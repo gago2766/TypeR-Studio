@@ -102,7 +102,7 @@ export default function App() {
   const [pages, setPages] = useState<MangaPage[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(-1);
   const [mangaSrc, setMangaSrc] = useState<string>(DEFAULT_MANGA_SRC);
-  const [zoom, setZoom] = useState<number>(1.0); // 👈 إضافة حالة الزووم المرفوعة للأعلى هنا
+  const [zoom, setZoom] = useState<number>(1.0); // 👈 تفعيل حالة الزووم المشتركة هنا
 
   // 📥 كائن الصورة للتحميل الاحتياطي على الهواتف الذكية ونظام Capacitor
   const [fallbackFile, setFallbackFile] = useState<{ url: string; blob: Blob; filename: string } | null>(null);
@@ -799,7 +799,7 @@ export default function App() {
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه الخطوة لاحقاً ↩).');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -2630,7 +2630,6 @@ export default function App() {
           handleUpdateLayer(activeLayer.id, { left: `${leftVal - step}px` });
         }
         if (e.key === 'ArrowRight') {
-          e.preventDefault();
           handleUpdateLayer(activeLayer.id, { left: `${leftVal + step}px` });
         }
       } else {
@@ -3465,25 +3464,56 @@ export default function App() {
               </button>
             </div>
 
-            {/* زري تقليب الصفحات */}
-            <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5">
-              <button
-                onClick={() => handlePageChange(currentPageIndex - 1)}
-                disabled={currentPageIndex <= 0}
-                className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
-              >
-                &lt;
-              </button>
-              <span className="px-3 font-semibold text-[11px]">
-                {pages.length > 0 ? `${currentPageIndex + 1} / ${pages.length}` : '0 / 0'}
-              </span>
-              <button
-                onClick={() => handlePageChange(currentPageIndex + 1)}
-                disabled={currentPageIndex === -1 || currentPageIndex >= pages.length - 1}
-                className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
-              >
-                &gt;
-              </button>
+            {/* زري تقليب الصفحات والتحكم بالزووم المدمج الجديد بجانبه على اليمين */}
+            <div className="flex items-center gap-1.5">
+              {/* تحكم الزووم المدمج الجديد */}
+              <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5 text-white">
+                <button
+                  type="button"
+                  onClick={() => setZoom(prev => Math.max(0.1, prev - 0.25))}
+                  className="py-1 px-2 hover:bg-[#333] hover:text-white rounded text-xs transition leading-none focus:outline-none cursor-pointer font-bold"
+                  title="تصغير (-)"
+                >
+                  −
+                </button>
+                <span 
+                  className="px-2 font-mono text-[11px] min-w-[45px] text-center cursor-pointer hover:text-[#007acc]"
+                  onClick={() => setZoom(1.0)}
+                  title="اضغط المزدوج لإعادة التعيين لـ 100%"
+                  onDoubleClick={() => setZoom(1.0)}
+                >
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoom(prev => Math.min(4.0, prev + 0.25))}
+                  className="py-1 px-2 hover:bg-[#333] hover:text-white rounded text-xs transition leading-none focus:outline-none cursor-pointer font-bold"
+                  title="تكبير (+)"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* زري تقليب الصفحات الأصلي */}
+              <div className="flex items-center bg-[#252525] border border-[#2d2d2d] rounded-lg p-0.5">
+                <button
+                  onClick={() => handlePageChange(currentPageIndex - 1)}
+                  disabled={currentPageIndex <= 0}
+                  className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
+                >
+                  &lt;
+                </button>
+                <span className="px-3 font-semibold text-[11px]">
+                  {pages.length > 0 ? `${currentPageIndex + 1} / ${pages.length}` : '0 / 0'}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPageIndex + 1)}
+                  disabled={currentPageIndex === -1 || currentPageIndex >= pages.length - 1}
+                  className="py-1 px-2 hover:bg-[#333] hover:text-white rounded disabled:opacity-20 text-xs transition leading-none focus:outline-none cursor-pointer"
+                >
+                  &gt;
+                </button>
+              </div>
             </div>
           </div>
 
@@ -3511,7 +3541,7 @@ export default function App() {
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={onSetActiveLayer}
+          onSetActiveLayer={setActiveLayer} // 👈 تم تغيير onSetActiveLayer لـ setActiveLayer لحل الـ ReferenceError
           onUpdateLayer={handleUpdateLayer}
           onAddSelectionBounds={(bounds) => {
             setSelectionBox({
@@ -3546,13 +3576,15 @@ export default function App() {
           watermarkPosition={watermarkPosition}
           watermarkSize={watermarkSize}
           onDuplicateLayer={handleDuplicateLayer}
+          zoom={zoom} // 👈 تمرير قيمة الزووم لمسرح العمل
+          setZoom={setZoom} // 👈 تمرير دالة تعديل الزووم لمسرح العمل
         />
 
         {/* لوحة التحكم بالطبقات السفلية والتراجع */}
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={onSetActiveLayer}
+          onSetActiveLayer={setActiveLayer} // 👈 تم تغيير onSetActiveLayer لـ setActiveLayer لحل الـ ReferenceError
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
@@ -3726,7 +3758,7 @@ export default function App() {
                 <select
                   value={editFormFamily}
                   onChange={e => setEditFormFamily(e.target.value)}
-                  className="w-48 bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2.5 py-1.5 text-xs outline-none"
+                  className="w-48 bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs outline-none"
                 >
                   {allFontsList.map(f => (
                     <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.name}</option>
@@ -3915,3 +3947,4 @@ export default function App() {
     </div>
   );
 }
+
