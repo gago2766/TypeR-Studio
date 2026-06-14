@@ -148,9 +148,10 @@ export function Workspace({
     startFS: number;
   } | null>(null);
 
-  const [verticalMoveState, setVerticalMoveState] = useState<{
+  const [topStretchState, setTopStretchState] = useState<{
     layerId: string;
     startY: number;
+    startHeight: number;
     startTop: number;
   } | null>(null);
 
@@ -416,7 +417,7 @@ export function Workspace({
       if (e.touches.length === 1) {
         const touch = e.touches[0];
 
-        if (isDrawing || dragState || proportionalResizeState || rotateState || verticalMoveState || leftStretchState) {
+        if (isDrawing || dragState || proportionalResizeState || rotateState || topStretchState || leftStretchState) {
           if (e.cancelable) e.preventDefault();
         }
 
@@ -594,12 +595,33 @@ export function Workspace({
           return;
         }
 
-        if (verticalMoveState) {
-          const dy = (touch.clientY - verticalMoveState.startY) / zoom;
-          const newTop = Math.round(verticalMoveState.startTop + dy);
-          onUpdateLayer(verticalMoveState.layerId, {
+        if (topStretchState) {
+          const dy = (touch.clientY - topStretchState.startY) / zoom;
+          const newH = Math.max(25, Math.round(topStretchState.startHeight - dy));
+          const newTop = Math.round(topStretchState.startTop + dy);
+
+          const layer = layers.find(l => l.id === topStretchState.layerId);
+          const updates: Partial<MangaLayer> = {
+            height: `${newH}px`,
             top: `${newTop}px`
-          });
+          };
+
+          if (layer && autoFitText) {
+            const fontSz = calculateOptimalFontSize(
+              layer.text,
+              parseFloat(layer.width) || 120,
+              newH,
+              layer.style.fontFamily,
+              layer.style.lineHeight,
+              parseFloat(layer.style.letterSpacing) || 0
+            );
+            updates.style = {
+              ...layer.style,
+              fontSize: `${fontSz}px`,
+            };
+          }
+
+          onUpdateLayer(topStretchState.layerId, updates);
           return;
         }
 
@@ -644,11 +666,11 @@ export function Workspace({
     dragState,
     proportionalResizeState,
     rotateState,
-    verticalMoveState,
+    topStretchState,
     leftStretchState,
     layers,
-    activeLayer,       // 👈 إضافة لضمان تحديث المحاذاة الذكية باللمس
-    wandDimensions     // 👈 إضافة لضمان تحديث المحاذاة الذكية باللمس
+    activeLayer,
+    wandDimensions
   ]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -996,12 +1018,33 @@ export function Workspace({
           }
         });
       }
-    } else if (verticalMoveState) {
-      const dy = (e.clientY - verticalMoveState.startY) / zoom;
-      const newTop = Math.round(verticalMoveState.startTop + dy);
-      onUpdateLayer(verticalMoveState.layerId, {
+    } else if (topStretchState) {
+      const dy = (e.clientY - topStretchState.startY) / zoom;
+      const newH = Math.max(25, Math.round(topStretchState.startHeight - dy));
+      const newTop = Math.round(topStretchState.startTop + dy);
+
+      const layer = layers.find(l => l.id === topStretchState.layerId);
+      const updates: Partial<MangaLayer> = {
+        height: `${newH}px`,
         top: `${newTop}px`
-      });
+      };
+
+      if (layer && autoFitText) {
+        const fontSz = calculateOptimalFontSize(
+          layer.text,
+          parseFloat(layer.width) || 120,
+          newH,
+          layer.style.fontFamily,
+          layer.style.lineHeight,
+          parseFloat(layer.style.letterSpacing) || 0
+        );
+        updates.style = {
+          ...layer.style,
+          fontSize: `${fontSz}px`,
+        };
+      }
+
+      onUpdateLayer(topStretchState.layerId, updates);
     } else if (leftStretchState) {
       const dx = (e.clientX - leftStretchState.startX) / zoom;
       const newW = Math.max(25, Math.round(leftStretchState.startWidth - dx));
@@ -1053,8 +1096,8 @@ export function Workspace({
     if (proportionalResizeState) {
       setProportionalResizeState(null);
     }
-    if (verticalMoveState) {
-      setVerticalMoveState(null);
+    if (topStretchState) {
+      setTopStretchState(null);
     }
     if (leftStretchState) {
       setLeftStretchState(null);
@@ -1069,7 +1112,7 @@ export function Workspace({
       resizeState ||
       rotateState ||
       proportionalResizeState ||
-      verticalMoveState ||
+      topStretchState ||
       leftStretchState ||
       isPanning ||
       (isDrawing && selectionBox)
@@ -1104,7 +1147,7 @@ export function Workspace({
     resizeState,
     rotateState,
     proportionalResizeState,
-    verticalMoveState,
+    topStretchState,
     leftStretchState,
     isPanning,
     isDrawing,
@@ -1544,26 +1587,6 @@ export function Workspace({
                     onMouseDown={e => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (onDuplicateLayer) {
-                        onDuplicateLayer(layer.id);
-                      }
-                    }}
-                    style={{
-                      position: 'absolute',
-                      bottom: '-14px',
-                      left: '-14px',
-                    }}
-                    className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm shadow-md hover:scale-110 active:scale-95 transition-transform cursor-pointer z-40 select-none"
-                    title="نسخ (تكرار) صندوق النص الحالي بنفس التنسيق"
-                  >
-                    📋
-                  </button>
-
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
                       const startFS = parseFloat(layer.style.fontSize) || 16;
                       setProportionalResizeState({
                         layerId: layer.id,
@@ -1610,9 +1633,10 @@ export function Workspace({
                     onMouseDown={e => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setVerticalMoveState({
+                      setTopStretchState({
                         layerId: layer.id,
                         startY: e.clientY,
+                        startHeight: parseFloat(layer.height) || 80,
                         startTop: parseFloat(layer.top) || 0,
                       });
                     }}
@@ -1620,9 +1644,10 @@ export function Workspace({
                       e.preventDefault();
                       e.stopPropagation();
                       const touch = e.touches[0];
-                      setVerticalMoveState({
+                      setTopStretchState({
                         layerId: layer.id,
                         startY: touch.clientY,
+                        startHeight: parseFloat(layer.height) || 80,
                         startTop: parseFloat(layer.top) || 0,
                       });
                     }}
@@ -1638,7 +1663,7 @@ export function Workspace({
                       transform: 'translateX(-50%)',
                     }}
                     className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[11px] shadow hover:scale-110 active:scale-90 transition-transform cursor-row-resize z-40 select-none"
-                    title="تحريك النص عمودياً (سحب) أو قلب النص رأسياً (اضغط مزدوجاً)"
+                    title="تمديد طول صندوق النص لتغيير الارتفاع"
                   >
                     ↕️
                   </button>
@@ -1678,55 +1703,8 @@ export function Workspace({
                     ↔️
                   </button>
 
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const alignments: Array<'center' | 'left' | 'right'> = ['center', 'left', 'right'];
-                      const currentIdx = alignments.indexOf(layer.style.textAlign || 'center');
-                      const nextIdx = (currentIdx + 1) % alignments.length;
-                      onUpdateLayer(layer.id, {
-                        style: {
-                          ...layer.style,
-                          textAlign: alignments[nextIdx]
-                        }
-                      });
-                    }}
-                    style={{
-                      position: 'absolute',
-                      right: '-24px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}
-                    className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[12px] shadow hover:scale-110 active:scale-90 transition-transform cursor-pointer z-40 select-none"
-                    title="تغيير اتجاه محاذاة النص الحالي (ضبط النص ليكون يمين، يسار، أو منتصف)"
-                  >
-                    ▤
-                  </button>
-
 
                   {/* --- 3. Bottom Accessories --- */}
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const val = prompt('تعديل نص صندوق الكتابة:', layer.text);
-                      if (val !== null) {
-                        onUpdateLayer(layer.id, { text: val });
-                      }
-                    }}
-                    style={{
-                      position: 'absolute',
-                      bottom: '-28px',
-                      left: '15%',
-                    }}
-                    className="w-8 h-7 bg-white text-gray-800 border border-neutral-600 rounded-full flex items-center justify-center text-xs shadow hover:scale-110 active:scale-90 transition-transform cursor-pointer z-40 select-none"
-                    title="تعديل الأحرف المكتوبة أو تغيير النص بالكامل بلمسة واحدة"
-                  >
-                    ⌨️
-                  </button>
 
                   <button
                     type="button"
@@ -1758,4 +1736,3 @@ export function Workspace({
   </div>
 );
 }
-
