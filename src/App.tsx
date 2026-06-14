@@ -195,7 +195,7 @@ export default function App() {
   
   const [selectedStyleId, setSelectedStyleId] = useState<string>('style_normal');
 
-  // مزامنة المجلدات والأنماط وحفظها تلقائياً وبشكل فوري عند حدوث أي تعديل (إضافة، حذف، تحرير)
+  // مزامنة المجلدات والأنماط وحفظها تلقائياً وبشكل فوري عند حدوث أي تعديل (إضافة, حذف, تحرير)
   useEffect(() => {
     try {
       localStorage.setItem('typer_studio_folders', JSON.stringify(folders));
@@ -798,7 +798,7 @@ export default function App() {
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه الخطوة لاحقاً ↩).');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -3414,7 +3414,7 @@ export default function App() {
       )}
 
       {/* منطقة مسرح العمل الرئيسي */}
-      <div className="flex-1 flex flex-col h-full bg-[#0d0d0d] relative overflow-hidden min-w-0">
+      <div className="flex-grow flex flex-col h-full bg-[#0d0d0d] relative overflow-hidden min-w-0">
         {/* شريط الإشعارات والصفحات العلوي */}
         <div className="px-2 sm:px-4 py-2 bg-[#1e1e1e] border-b border-[#2d2d2d] flex flex-wrap md:flex-nowrap justify-between items-center gap-2 text-xs text-gray-300 select-none">
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -3510,7 +3510,7 @@ export default function App() {
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={onSetActiveLayer}
+          onSetActiveLayer={setActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onAddSelectionBounds={(bounds) => {
             setSelectionBox({
@@ -3551,7 +3551,7 @@ export default function App() {
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={onSetActiveLayer}
+          onSetActiveLayer={setActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
@@ -3655,6 +3655,7 @@ export default function App() {
         onSelectBubbleShape={handleSelectBubbleShape}
         onDeleteFolder={handleDeleteFolder} // 👈 ربط دالة حذف المجلدات
         onEditStyle={handleOpenEditStyle} // 👈 ربط دالة فتح شاشة التعديل
+        setBubbleMargin={setBubbleMargin} // 👈 تم التمرير لربط دالة تعديل الهامش
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
