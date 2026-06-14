@@ -76,7 +76,7 @@ export function LayersPanel({
   const handleSizeChange = (amount: number) => {
     if (!styles) return;
     const currentSize = parseFloat(styles.fontSize) || 16;
-    const newSize = Math.max(6, Math.min(120, currentSize + amount));
+    const newSize = Math.max(1, Math.min(100, currentSize + amount));
     handleStyleChange({
       fontSize: `${newSize}px`,
     });
@@ -249,31 +249,46 @@ export function LayersPanel({
             id="layer-editor-panel"
             className="px-3 py-1 bg-[#111] border-t border-[#2a2a2a] flex items-center gap-4 text-xs overflow-x-auto select-none shrink-0"
           >
-            {/* Font size adjustments */}
+            {/* Font size adjustments with 1-100 limits */}
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-gray-400 shrink-0 select-none">حجم</span>
               <input
                 type="number"
-                min="6"
-                max="120"
-                value={parseInt(styles.fontSize) || 16}
+                min="1"
+                max="100"
+                value={parseInt(styles.fontSize) || ""}
                 onChange={e => {
-                  const val = e.target.value ? `${e.target.value}px` : '16px';
-                  handleStyleChange({ fontSize: val });
+                  const rawVal = e.target.value;
+                  if (rawVal === '') {
+                    handleStyleChange({ fontSize: '' });
+                    return;
+                  }
+                  let valNum = parseInt(rawVal);
+                  if (valNum > 100) valNum = 100;
+                  if (valNum < 1) valNum = 1;
+                  handleStyleChange({ fontSize: `${valNum}px` });
+                }}
+                onBlur={() => {
+                  const size = parseInt(styles.fontSize);
+                  if (isNaN(size) || size < 1) {
+                    handleStyleChange({ fontSize: '1px' });
+                  } else if (size > 100) {
+                    handleStyleChange({ fontSize: '100px' });
+                  }
                 }}
                 className="w-12 bg-[#1e1e1e] border border-[#333] text-white rounded text-center text-[10px] py-0.5 focus:outline-none"
                 id="le-size"
               />
               <button
                 onClick={() => handleSizeChange(-1)}
-                className="bg-[#222] border border-[#333] text-gray-300 hover:bg-[#2d2d2d] rounded px-1.5 focus:outline-none font-bold"
+                className="bg-[#222] border border-[#333] text-gray-300 hover:bg-[#2d2d2d] rounded px-1.5 focus:outline-none font-bold cursor-pointer"
                 id="le-size-down"
               >
                 −
               </button>
               <button
                 onClick={() => handleSizeChange(1)}
-                className="bg-[#222] border border-[#333] text-gray-300 hover:bg-[#2d2d2d] rounded px-1.5 focus:outline-none font-bold"
+                className="bg-[#222] border border-[#333] text-gray-300 hover:bg-[#2d2d2d] rounded px-1.5 focus:outline-none font-bold cursor-pointer"
                 id="le-size-up"
               >
                 +
