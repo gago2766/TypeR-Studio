@@ -429,7 +429,7 @@ export function Workspace({
           const clickY = (touch.clientY - rect.top) / zoom;
 
           const left = Math.min(startPos.x, clickX);
-          const top = Math.min(startPos.y, clickY);
+          const top = Math.min(startPos.y, currentY);
           const width = Math.abs(clickX - startPos.x);
           const height = Math.abs(clickY - startPos.y);
 
@@ -1302,437 +1302,401 @@ export function Workspace({
           width: `${dim.w * zoom}px`,
           height: `${dim.h * zoom}px`,
           position: 'relative',
-        }}
-        className="mx-auto"
-      >
-        <div
-          ref={imageWrapperRef}
-          id="image-wrapper"
-          onMouseDown={handleMouseDown}
-          style={{
-            width: `${dim.w}px`,
-            height: `${dim.h}px`,
-            transform: `scale(${zoom})`,
-            transformOrigin: 'top left',
-            position: 'absolute',
-            top: 0,
-            left: 0,
           }}
-          className="bg-black shadow-2xl select-none"
+          className="mx-auto"
         >
-        <img
-          ref={imageRef}
-          id="manga-img"
-          src={mangaSrc}
-          alt="Manga Page"
-          onLoad={handleImageLoad}
-          className="block max-w-full h-auto"
-          referrerPolicy="no-referrer"
-        />
-
-        {/* Cleaning & redrawing Canvas Layer */}
-        <canvas
-          ref={cleaningCanvasRef}
-          id="cleaning-canvas"
-          className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-        />
-
-        {/* Clone stamp visual anchor target */}
-        {stampSource && imageRef.current && (
           <div
+            ref={imageWrapperRef}
+            id="image-wrapper"
+            onMouseDown={handleMouseDown}
             style={{
-              left: `${stampSource.x / (imageRef.current.naturalWidth / imageRef.current.offsetWidth || 1)}px`,
-              top: `${stampSource.y / (imageRef.current.naturalHeight / imageRef.current.offsetHeight || 1)}px`,
-              transform: 'translate(-50%, -50%)',
+              width: `${dim.w}px`,
+              height: `${dim.h}px`,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+              position: 'absolute',
+              top: 0,
+              left: 0,
             }}
-            className="absolute border border-red-500 bg-red-500/20 w-4 h-4 rounded-full pointer-events-none z-30 flex items-center justify-center after:content-[''] after:w-2 after:h-[1px] after:bg-red-500 before:content-[''] before:h-2 before:w-[1px] before:bg-red-500"
-            title="مصدر الختم"
-          />
-        )}
-
-        {/* Live Watermark Overlay View */}
-        {watermarkEnabled && (
-          <div
-            style={{
-              opacity: watermarkOpacity,
-              fontSize: `${watermarkSize}px`,
-              transition: 'all 0.2s',
-            }}
-            className={`absolute pointer-events-none select-none z-[12] ${
-              watermarkPosition === 'top-left' ? 'top-4 left-4' :
-              watermarkPosition === 'top-right' ? 'top-4 right-4' :
-              watermarkPosition === 'bottom-left' ? 'bottom-4 left-4' :
-              'bottom-4 right-4'
-            }`}
+            className="bg-black shadow-2xl select-none"
           >
-            {watermarkType === 'text' ? (
-              <span 
-                style={{
-                  fontFamily: 'Tahoma, sans-serif',
-                  textShadow: '1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8), 1px -1px 3px rgba(0,0,0,0.8), -1px 1px 3px rgba(0,0,0,0.8)',
-                }}
-                className="text-white font-bold tracking-wide whitespace-nowrap block"
-              >
-                {watermarkText}
-              </span>
-            ) : (
-              watermarkImage && (
-                <img
-                  src={watermarkImage}
-                  style={{
-                    width: `${watermarkSize * 4}px`,
-                    height: 'auto',
-                  }}
-                  className="object-contain block max-w-full drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]"
-                  alt="Watermark logo"
-                />
-              )
-            )}
-          </div>
-        )}
-
-        {/* 📐 رسم خطوط الإرشاد والمحاذاة التفاعلية عند التوسيط أو الاقتراب من حواف الفقاعة */}
-        {dragState && guides.bounds && (
-          <div className="absolute inset-0 pointer-events-none z-20">
-            {/* حدود الفقاعة الأربعة كمستطيل متقطع */}
-            <div 
-              style={{
-                left: `${guides.bounds.left}px`,
-                top: `${guides.bounds.top}px`,
-                width: `${guides.bounds.right - guides.bounds.left}px`,
-                height: `${guides.bounds.bottom - guides.bounds.top}px`,
-              }}
-              className="absolute border border-dashed border-[#8e44ad]/40"
-            />
-            {/* خط الإرشاد الرأسي عند التوسيط الأفقي التام مع السنتر */}
-            {guides.vertical !== null && (
-              <div 
-                style={{
-                  left: `${guides.vertical}px`,
-                  top: `${guides.bounds.top}px`,
-                  height: `${guides.bounds.bottom - guides.bounds.top}px`,
-                }}
-                className="absolute border-l border-dashed border-[#007acc] w-0 -translate-x-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:bottom-0"
-              />
-            )}
-            {/* خط الإرشاد الأفقي عند التوسيط العمودي التام مع السنتر */}
-            {guides.horizontal !== null && (
-              <div 
-                style={{
-                  top: `${guides.horizontal}px`,
-                  left: `${guides.bounds.left}px`,
-                  width: `${guides.bounds.right - guides.bounds.left}px`,
-                }}
-                className="absolute border-t border-dashed border-[#007acc] h-0 -translate-y-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full before:absolute before:left-0 after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:right-0"
-              />
-            )}
-          </div>
-        )}
-
-        {/* Dynamic Canvas representing Magic Wand bounds */}
-        <canvas
-          ref={wandCanvasRef}
-          id="wand-canvas"
-          className="absolute top-0 left-0 pointer-events-none z-20"
-        />
-
-        {/* Dash rectangular selection overlay box */}
-        {selectionBox && selectionBox.visible && (
-          <div
-            id="selection-box"
-            style={{
-              left: `${selectionBox.left}px`,
-              top: `${selectionBox.top}px`,
-              width: `${selectionBox.width}px`,
-              height: `${selectionBox.height}px`,
-              display: 'block',
-            }}
-            className="absolute border-2 border-dashed border-[#4CAF50] bg-[#4CAF50]/10 pointer-events-none z-20 selection-box-bg"
+          <img
+            ref={imageRef}
+            id="manga-img"
+            src={mangaSrc}
+            alt="Manga Page"
+            onLoad={handleImageLoad}
+            className="block max-w-full h-auto"
+            referrerPolicy="no-referrer"
           />
-        )}
 
-        {/* Layer bubbles list rendered dynamically */}
-        {layers.map(layer => {
-          if (layer.hidden) return null;
-          const isActive = activeLayer?.id === layer.id;
+          {/* Cleaning & redrawing Canvas Layer */}
+          <canvas
+            ref={cleaningCanvasRef}
+            id="cleaning-canvas"
+            className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+          />
 
-          const isTransparent =
-            !layer.style.bgColor ||
-            layer.style.bgColor === 'transparent' ||
-            layer.style.bgColor === 'rgba(0,0,0,0)' ||
-            layer.style.bgColor === 'rgba(0, 0, 0, 0)';
-
-          return (
+          {/* Clone stamp visual anchor target */}
+          {stampSource && imageRef.current && (
             <div
-              key={layer.id}
-              id={`layer-${layer.id}`}
-              onMouseDown={e => handleLayerDragStart(layer, e)}
-              onTouchStart={e => handleLayerTouchStart(layer, e)}
               style={{
-                left: layer.left,
-                top: layer.top,
-                width: layer.width,
-                height: layer.height,
-                backgroundColor: isTransparent ? 'transparent' : layer.style.bgColor,
-                transform: `rotate(${layer.angle || 0}deg) ${layer.flippedY ? 'scaleY(-1)' : ''}`,
-                transformOrigin: 'center center',
-                ...(isActive ? {
-                  border: '3px double #007acc',
-                  outline: '1px solid rgba(0, 122, 204, 0.4)',
-                  outlineOffset: '1px'
-                } : {})
+                left: `${stampSource.x / (imageRef.current.naturalWidth / imageRef.current.offsetWidth || 1)}px`,
+                top: `${stampSource.y / (imageRef.current.naturalHeight / imageRef.current.offsetHeight || 1)}px`,
+                transform: 'translate(-50%, -50%)',
               }}
-              className={`absolute cursor-move flex items-center justify-center text-center p-1 border border-transparent z-10 box-border hover:border-gray-400/60 ${
-                isActive ? 'z-30' : ''
+              className="absolute border border-red-500 bg-red-500/20 w-4 h-4 rounded-full pointer-events-none z-30 flex items-center justify-center after:content-[''] after:w-2 after:h-[1px] after:bg-red-500 before:content-[''] before:h-2 before:w-[1px] before:bg-red-500"
+              title="مصدر الختم"
+            />
+          )}
+
+          {/* Live Watermark Overlay View */}
+          {watermarkEnabled && (
+            <div
+              style={{
+                opacity: watermarkOpacity,
+                fontSize: `${watermarkSize}px`,
+                transition: 'all 0.2s',
+              }}
+              className={`absolute pointer-events-none select-none z-[12] ${
+                watermarkPosition === 'top-left' ? 'top-4 left-4' :
+                watermarkPosition === 'top-right' ? 'top-4 right-4' :
+                watermarkPosition === 'bottom-left' ? 'bottom-4 left-4' :
+                'bottom-4 right-4'
               }`}
             >
-              {/* Inline Text Content block */}
-              <div
-                style={{
-                  fontFamily: layer.style.fontFamily,
-                  color: layer.style.color,
-                  fontSize: layer.style.fontSize,
-                  fontWeight: layer.style.fontWeight,
-                  fontStyle: layer.style.fontStyle,
-                  textDecoration: layer.style.textDecoration,
-                  textAlign: layer.style.textAlign,
-                  lineHeight: layer.style.lineHeight,
-                  letterSpacing: layer.style.letterSpacing,
-                  outline: 'none',
-                  backgroundColor: 'transparent',
-                  direction: 'rtl',
-                  unicodeBidi: 'plaintext',
-                }}
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={e => {
-                  onUpdateLayer(layer.id, { text: e.target.innerText });
-                }}
-                className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden"
-              >
-                {layer.text}
-              </div>
-
-              {/* Special Controls and Handles (Shown when active) */}
-              {isActive && (
-                <>
-                  {/* --- 1. Corner Handles --- */}
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.stopPropagation();
-                      onUpdateLayer(layer.id, { hidden: true });
-                    }}
+              {watermarkType === 'text' ? (
+                <span 
+                  style={{
+                    fontFamily: 'Tahoma, sans-serif',
+                    textShadow: '1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8), 1px -1px 3px rgba(0,0,0,0.8), -1px 1px 3px rgba(0,0,0,0.8)',
+                  }}
+                  className="text-white font-bold tracking-wide whitespace-nowrap block"
+                >
+                  {watermarkText}
+                </span>
+              ) : (
+                watermarkImage && (
+                  <img
+                    src={watermarkImage}
                     style={{
-                      position: 'absolute',
-                      top: '-14px',
-                      left: '-14px',
+                      width: `${watermarkSize * 4}px`,
+                      height: 'auto',
                     }}
-                    className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm font-bold shadow-md hover:scale-110 active:scale-95 transition-transform cursor-pointer z-40 select-none"
-                    title="حذف صندوق النص بالكامل من التصميم"
-                  >
-                    ✕
-                  </button>
-
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const el = document.getElementById(`layer-${layer.id}`);
-                      if (!el) return;
-                      const rect = el.getBoundingClientRect();
-                      const cx = rect.left + rect.width / 2;
-                      const cy = rect.top + rect.height / 2;
-                      const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
-                      setRotateState({
-                        layerId: layer.id,
-                        centerX: cx,
-                        centerY: cy,
-                        startAngle,
-                        initialLayerAngle: layer.angle || 0,
-                      });
-                    }}
-                    onTouchStart={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const el = document.getElementById(`layer-${layer.id}`);
-                      if (!el) return;
-                      const rect = el.getBoundingClientRect();
-                      const cx = rect.left + rect.width / 2;
-                      const cy = rect.top + rect.height / 2;
-                      const touch = e.touches[0];
-                      const startAngle = Math.atan2(touch.clientY - cy, touch.clientX - cx) * (180 / Math.PI);
-                      setRotateState({
-                        layerId: layer.id,
-                        centerX: cx,
-                        centerY: cy,
-                        startAngle,
-                        initialLayerAngle: layer.angle || 0,
-                      });
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '-14px',
-                      right: '-14px',
-                    }}
-                    className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm shadow-md hover:scale-110 active:scale-95 transition-transform cursor-alias z-40 select-none"
-                    title="تدوير النص بأي زاوية (لف النص يميناً أو يساراً)"
-                  >
-                    🔄
-                  </button>
-
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startFS = parseFloat(layer.style.fontSize) || 16;
-                      setProportionalResizeState({
-                        layerId: layer.id,
-                        startX: e.clientX,
-                        startY: e.clientY,
-                        startWidth: parseFloat(layer.width) || 120,
-                        startHeight: parseFloat(layer.height) || 80,
-                        startLeft: parseFloat(layer.left) || 0,
-                        startTop: parseFloat(layer.top) || 0,
-                        startFS,
-                      });
-                    }}
-                    onTouchStart={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startFS = parseFloat(layer.style.fontSize) || 16;
-                      const touch = e.touches[0];
-                      setProportionalResizeState({
-                        layerId: layer.id,
-                        startX: touch.clientX,
-                        startY: touch.clientY,
-                        startWidth: parseFloat(layer.width) || 120,
-                        startHeight: parseFloat(layer.height) || 80,
-                        startLeft: parseFloat(layer.left) || 0,
-                        startTop: parseFloat(layer.top) || 0,
-                        startFS,
-                      });
-                    }}
-                    style={{
-                      position: 'absolute',
-                      bottom: '-14px',
-                      right: '-14px',
-                    }}
-                    className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm shadow-md hover:scale-110 active:scale-95 transition-transform cursor-se-resize z-40 select-none"
-                    title="تكبير أو تصغير حجم صندوق النص (وبالتالي حجم الخط) بشكل متناسق"
-                  >
-                    ⤡
-                  </button>
-
-
-                  {/* --- 2. Side Handles --- */}
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setTopStretchState({
-                        layerId: layer.id,
-                        startY: e.clientY,
-                        startHeight: parseFloat(layer.height) || 80,
-                        startTop: parseFloat(layer.top) || 0,
-                      });
-                    }}
-                    onTouchStart={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const touch = e.touches[0];
-                      setTopStretchState({
-                        layerId: layer.id,
-                        startY: touch.clientY,
-                        startHeight: parseFloat(layer.height) || 80,
-                        startTop: parseFloat(layer.top) || 0,
-                      });
-                    }}
-                    onDoubleClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onUpdateLayer(layer.id, { flippedY: !layer.flippedY });
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '-24px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                    }}
-                    className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[11px] shadow hover:scale-110 active:scale-90 transition-transform cursor-row-resize z-40 select-none"
-                    title="تمديد طول صندوق النص لتغيير الارتفاع"
-                  >
-                    ↕️
-                  </button>
-
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setLeftStretchState({
-                        layerId: layer.id,
-                        startX: e.clientX,
-                        startWidth: parseFloat(layer.width) || 120,
-                        startLeft: parseFloat(layer.left) || 0,
-                      });
-                    }}
-                    onTouchStart={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const touch = e.touches[0];
-                      setLeftStretchState({
-                        layerId: layer.id,
-                        startX: touch.clientX,
-                        startWidth: parseFloat(layer.width) || 120,
-                        startLeft: parseFloat(layer.left) || 0,
-                      });
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: '-24px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}
-                    className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[11px] shadow hover:scale-110 active:scale-90 transition-transform cursor-col-resize z-40 select-none"
-                    title="تمديد عرض صندوق النص لتغيير نقطة بداية السطور من اليسار"
-                  >
-                    ↔️
-                  </button>
-
-
-                  {/* --- 3. Bottom Accessories --- */}
-
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (onSavePresetFromStyle) {
-                        onSavePresetFromStyle(layer.style);
-                      }
-                    }}
-                    style={{
-                      position: 'absolute',
-                      bottom: '-28px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                    }}
-                    className="w-8 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-[10px] shadow hover:scale-110 active:scale-90 transition-transform cursor-pointer z-40 select-none font-bold gap-0.5"
-                    title="حفظ النمط والتنسيق الحالي كقالب جاهز للاستخدام الفوري"
-                  >
-                    ➕📂
-                  </button>
-                </>
+                    className="object-contain block max-w-full drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]"
+                    alt="Watermark logo"
+                  />
+                )
               )}
             </div>
-          );
-      })}
+          )}
+
+          {/* 📐 رسم خطوط الإرشاد والمحاذاة التفاعلية عند التوسيط أو الاقتراب من حواف الفقاعة */}
+          {dragState && guides.bounds && (
+            <div className="absolute inset-0 pointer-events-none z-20">
+              {/* حدود الفقاعة الأربعة كمستطيل متقطع */}
+              <div 
+                style={{
+                  left: `${guides.bounds.left}px`,
+                  top: `${guides.bounds.top}px`,
+                  width: `${guides.bounds.right - guides.bounds.left}px`,
+                  height: `${guides.bounds.bottom - guides.bounds.top}px`,
+                }}
+                className="absolute border border-dashed border-[#8e44ad]/40"
+              />
+              {/* خط الإرشاد الرأسي عند التوسيط الأفقي التام مع السنتر */}
+              {guides.vertical !== null && (
+                <div 
+                  style={{
+                    left: `${guides.vertical}px`,
+                    top: `${guides.bounds.top}px`,
+                    height: `${guides.bounds.bottom - guides.bounds.top}px`,
+                  }}
+                  className="absolute border-l border-dashed border-[#007acc] w-0 -translate-x-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:bottom-0"
+                />
+              )}
+              {/* خط الإرشاد الأفقي عند التوسيط العمودي التام مع السنتر */}
+              {guides.horizontal !== null && (
+                <div 
+                  style={{
+                    top: `${guides.horizontal}px`,
+                    left: `${guides.bounds.left}px`,
+                    width: `${guides.bounds.right - guides.bounds.left}px`,
+                  }}
+                  className="absolute border-t border-dashed border-[#007acc] h-0 -translate-y-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full before:absolute before:left-0 after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:right-0"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Dynamic Canvas representing Magic Wand bounds */}
+          <canvas
+            ref={wandCanvasRef}
+            id="wand-canvas"
+            className="absolute top-0 left-0 pointer-events-none z-20"
+          />
+
+          {/* Dash rectangular selection overlay box */}
+          {selectionBox && selectionBox.visible && (
+            <div
+              id="selection-box"
+              style={{
+                left: `${selectionBox.left}px`,
+                top: `${selectionBox.top}px`,
+                width: `${selectionBox.width}px`,
+                height: `${selectionBox.height}px`,
+                display: 'block',
+              }}
+              className="absolute border-2 border-dashed border-[#4CAF50] bg-[#4CAF50]/10 pointer-events-none z-20 selection-box-bg"
+            />
+          )}
+
+          {/* Layer bubbles list rendered dynamically */}
+          {layers.map(layer => {
+            if (layer.hidden) return null;
+            const isActive = activeLayer?.id === layer.id;
+
+            const isTransparent =
+              !layer.style.bgColor ||
+              layer.style.bgColor === 'transparent' ||
+              layer.style.bgColor === 'rgba(0,0,0,0)' ||
+              layer.style.bgColor === 'rgba(0, 0, 0, 0)';
+
+            return (
+              <div
+                key={layer.id}
+                id={`layer-${layer.id}`}
+                onMouseDown={e => handleLayerDragStart(layer, e)}
+                onTouchStart={e => handleLayerTouchStart(layer, e)}
+                style={{
+                  left: layer.left,
+                  top: layer.top,
+                  width: layer.width,
+                  height: layer.height,
+                  backgroundColor: isTransparent ? 'transparent' : layer.style.bgColor,
+                  transform: `rotate(${layer.angle || 0}deg) ${layer.flippedY ? 'scaleY(-1)' : ''}`,
+                  transformOrigin: 'center center',
+                  ...(isActive ? {
+                    border: '3px double #007acc',
+                    outline: '1px solid rgba(0, 122, 204, 0.4)',
+                    outlineOffset: '1px'
+                  } : {})
+                }}
+                className={`absolute cursor-move flex items-center justify-center text-center p-1 border border-transparent z-10 box-border hover:border-gray-400/60 ${
+                  isActive ? 'z-30' : ''
+                }`}
+              >
+                {/* Inline Text Content block */}
+                <div
+                  style={{
+                    fontFamily: layer.style.fontFamily,
+                    color: layer.style.color,
+                    fontSize: layer.style.fontSize,
+                    fontWeight: layer.style.fontWeight,
+                    fontStyle: layer.style.fontStyle,
+                    textDecoration: layer.style.textDecoration,
+                    textAlign: layer.style.textAlign,
+                    lineHeight: layer.style.lineHeight,
+                    letterSpacing: layer.style.letterSpacing,
+                    outline: 'none',
+                    backgroundColor: 'transparent',
+                    direction: 'rtl',
+                    unicodeBidi: 'plaintext',
+                  }}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={e => {
+                    onUpdateLayer(layer.id, { text: e.target.innerText });
+                  }}
+                  className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden"
+                >
+                  {layer.text}
+                </div>
+
+                {/* Special Controls and Handles (Shown when active) */}
+                {isActive && (
+                  <>
+                    {/* --- 1. Corner Handles --- */}
+
+                    <button
+                      type="button"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const el = document.getElementById(`layer-${layer.id}`);
+                        if (!el) return;
+                        const rect = el.getBoundingClientRect();
+                        const cx = rect.left + rect.width / 2;
+                        const cy = rect.top + rect.height / 2;
+                        const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
+                        setRotateState({
+                          layerId: layer.id,
+                          centerX: cx,
+                          centerY: cy,
+                          startAngle,
+                          initialLayerAngle: layer.angle || 0,
+                        });
+                      }}
+                      onTouchStart={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const el = document.getElementById(`layer-${layer.id}`);
+                        if (!el) return;
+                        const rect = el.getBoundingClientRect();
+                        const cx = rect.left + rect.width / 2;
+                        const cy = rect.top + rect.height / 2;
+                        const touch = e.touches[0];
+                        const startAngle = Math.atan2(touch.clientY - cy, touch.clientX - cx) * (180 / Math.PI);
+                        setRotateState({
+                          layerId: layer.id,
+                          centerX: cx,
+                          centerY: cy,
+                          startAngle,
+                          initialLayerAngle: layer.angle || 0,
+                        });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '-14px',
+                        right: '-14px',
+                      }}
+                      className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm shadow-md hover:scale-110 active:scale-95 transition-transform cursor-alias z-40 select-none"
+                      title="تدوير النص بأي زاوية (لف النص يميناً أو يساراً)"
+                    >
+                      🔄
+                    </button>
+
+                    <button
+                      type="button"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const startFS = parseFloat(layer.style.fontSize) || 16;
+                        setProportionalResizeState({
+                          layerId: layer.id,
+                          startX: e.clientX,
+                          startY: e.clientY,
+                          startWidth: parseFloat(layer.width) || 120,
+                          startHeight: parseFloat(layer.height) || 80,
+                          startLeft: parseFloat(layer.left) || 0,
+                          startTop: parseFloat(layer.top) || 0,
+                          startFS,
+                        });
+                      }}
+                      onTouchStart={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const startFS = parseFloat(layer.style.fontSize) || 16;
+                        const touch = e.touches[0];
+                        setProportionalResizeState({
+                          layerId: layer.id,
+                          startX: touch.clientX,
+                          startY: touch.clientY,
+                          startWidth: parseFloat(layer.width) || 120,
+                          startHeight: parseFloat(layer.height) || 80,
+                          startLeft: parseFloat(layer.left) || 0,
+                          startTop: parseFloat(layer.top) || 0,
+                          startFS,
+                        });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        bottom: '-14px',
+                        right: '-14px',
+                      }}
+                      className="w-7 h-7 bg-white text-gray-800 border-2 border-neutral-800 rounded-full flex items-center justify-center text-sm shadow-md hover:scale-110 active:scale-95 transition-transform cursor-se-resize z-40 select-none"
+                      title="تكبير أو تصغير حجم صندوق النص (وبالتالي حجم الخط) بشكل متناسق"
+                    >
+                      ⤡
+                    </button>
+
+
+                    {/* --- 2. Side Handles --- */}
+                    <button
+                      type="button"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setTopStretchState({
+                          layerId: layer.id,
+                          startY: e.clientY,
+                          startHeight: parseFloat(layer.height) || 80,
+                          startTop: parseFloat(layer.top) || 0,
+                        });
+                      }}
+                      onTouchStart={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const touch = e.touches[0];
+                        setTopStretchState({
+                          layerId: layer.id,
+                          startY: touch.clientY,
+                          startHeight: parseFloat(layer.height) || 80,
+                          startTop: parseFloat(layer.top) || 0,
+                        });
+                      }}
+                      onDoubleClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onUpdateLayer(layer.id, { flippedY: !layer.flippedY });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '-24px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                      }}
+                      className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[11px] shadow hover:scale-110 active:scale-90 transition-transform cursor-row-resize z-40 select-none"
+                      title="تمديد طول صندوق النص لتغيير الارتفاع"
+                    >
+                      ↕️
+                    </button>
+
+                    <button
+                      type="button"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setLeftStretchState({
+                          layerId: layer.id,
+                          startX: e.clientX,
+                          startWidth: parseFloat(layer.width) || 120,
+                          startLeft: parseFloat(layer.left) || 0,
+                        });
+                      }}
+                      onTouchStart={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const touch = e.touches[0];
+                        setLeftStretchState({
+                          layerId: layer.id,
+                          startX: touch.clientX,
+                          startWidth: parseFloat(layer.width) || 120,
+                          startLeft: parseFloat(layer.left) || 0,
+                        });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: '-24px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
+                      className="w-6 h-6 bg-white text-gray-800 border border-neutral-600 rounded flex items-center justify-center text-[11px] shadow hover:scale-110 active:scale-90 transition-transform cursor-col-resize z-40 select-none"
+                      title="تمديد عرض صندوق النص لتغيير نقطة بداية السطور من اليسار"
+                    >
+                      ↔️
+                    </button>
+
+
+                    {/* --- 3. Bottom Accessories --- */}
+
+                  </>
+                )}
+              </div>
+            );
+        })}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
