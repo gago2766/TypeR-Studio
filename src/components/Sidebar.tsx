@@ -1,13 +1,10 @@
 import React, { useRef } from 'react';
-import { StyleFolder, TextStyle, ProcessedLine, ShapePreset, CustomFont } from '../types';
+import { StyleFolder, TextStyle, ProcessedLine, CustomFont } from '../types';
 
 interface SidebarProps {
   // Page operations
   onImageUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onExportPNG: () => void;
-  onExportPSD: () => void;
-  onExportAll: () => void;
-  onExportAllZip: () => void;
   onSaveState: () => void;
   onLoadState: () => void;
   onShare: () => void;
@@ -75,13 +72,6 @@ interface SidebarProps {
   onOpenFontManager: () => void;
   onApplyStyleToActiveLayer: () => void;
 
-  // Shape Presets
-  presets: ShapePreset[];
-  activePresetId: string | null;
-  onApplyPreset: (presetId: string) => void;
-  onSaveCurrentPreset: () => void;
-  onClearPreset: () => void;
-
   // Arabic Tatweel (Kashida)
   tatweelStrength: number;
   setTatweelStrength: (val: number) => void;
@@ -124,9 +114,6 @@ interface SidebarProps {
 export function Sidebar({
   onImageUpload,
   onExportPNG,
-  onExportPSD,
-  onExportAll,
-  onExportAllZip,
   onSaveState,
   onLoadState,
   onShare,
@@ -183,11 +170,6 @@ export function Sidebar({
   setFavFonts,
   onOpenFontManager,
   onApplyStyleToActiveLayer,
-  presets,
-  activePresetId,
-  onApplyPreset,
-  onSaveCurrentPreset,
-  onClearPreset,
   tatweelStrength,
   setTatweelStrength,
   tatweelMargin,
@@ -284,34 +266,6 @@ export function Sidebar({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            onClick={onExportPSD}
-            className="bg-[#107c41] text-white hover:bg-[#0a5c30] text-[11px] font-semibold py-2 px-1 rounded transition select-none truncate flex items-center justify-center gap-1 cursor-pointer"
-            id="export-psd-btn"
-            title="تصدير الصفحة كملف فوتوشوب PSD مع طبقات نصوص مستقلة"
-          >
-            <span>🎨 تصدير PSD</span>
-          </button>
-          <button
-            onClick={onExportAllZip}
-            className="bg-[#d27d2d] text-white hover:bg-[#d27d2d] text-[11px] font-semibold py-2 px-1 rounded transition select-none truncate flex items-center justify-center gap-1 cursor-pointer"
-            id="export-zip-btn"
-            title="تصدير وضغط جميع الصفحات في ملف ZIP واحد"
-          >
-            <span>📦 تصدير ZIP</span>
-          </button>
-        </div>
-        <div className="grid grid-cols-1">
-          <button
-            onClick={onExportAll}
-            className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] text-[10px] py-1.5 px-2 rounded transition select-none truncate flex items-center justify-center gap-1 cursor-pointer"
-            id="export-all-btn"
-            title="تصدير وتحميل جميع الصفحات كصور منفردة متتالية"
-          >
-            <span>🎞️ تصدير جميع الصفحات كصور منفصلة</span>
-          </button>
-        </div>
         <div className="grid grid-cols-2 gap-1 compact-hide">
           <button
             onClick={onSaveState}
@@ -1018,58 +972,6 @@ export function Sidebar({
             </div>
           )}
 
-        </div>
-
-        {/* Shape Presets */}
-        <div className="border border-[#2d2d2d] rounded-lg p-2.5 bg-[#151515]/30 flex flex-col gap-1.5 compact-hide">
-          <h3 className="text-xs text-white uppercase font-bold pb-0.5 border-b border-[#2d2d2d] mb-1">
-            📐 أنماط الأشكال
-          </h3>
-          <div className="grid grid-cols-4 gap-1.5" id="presets-grid">
-            {presets.map(p => {
-              const isActive = p.id === activePresetId;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => onApplyPreset(p.id)}
-                  className={`p-1 bg-[#1e1e1e] border rounded cursor-pointer text-center text-[10px] flex flex-col items-center gap-1 transition ${
-                    isActive ? 'border-[#007acc] bg-[#0d2233] text-white font-bold' : 'border-[#333] hover:border-[#007acc]'
-                  }`}
-                >
-                  <div
-                    style={{
-                      fontFamily: p.font,
-                      color: p.color,
-                      background: p.bg === 'transparent' ? '#252525' : p.bg,
-                      fontWeight: p.bold ? 'bold' : 'normal',
-                      fontStyle: p.italic ? 'italic' : 'normal',
-                    }}
-                    className="w-full h-7 rounded text-[8px] flex items-center justify-center overflow-hidden"
-                  >
-                    {p.name}
-                  </div>
-                  <span className="truncate w-full max-w-[55px] opacity-80 text-[9px]">{p.name}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex gap-1.5 mt-1.5">
-            <button
-              onClick={onSaveCurrentPreset}
-              className="flex-1 bg-[#007acc] hover:bg-[#0062a3] text-white py-1 px-1.5 rounded-lg text-[10px] shadow transition truncate font-bold cursor-pointer"
-              id="save-preset-btn"
-            >
-              💾 حفظ النمط الحالي
-            </button>
-            <button
-              onClick={onClearPreset}
-              className="bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d] rounded shrink-0 p-1 w-8 flex items-center justify-center text-xs cursor-pointer"
-              id="clear-preset-btn"
-              title="إلغاء التحديد"
-            >
-              ✕
-            </button>
-          </div>
         </div>
 
         {/* Arabic Tatweel system */}
