@@ -102,6 +102,7 @@ export default function App() {
   const [pages, setPages] = useState<MangaPage[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(-1);
   const [mangaSrc, setMangaSrc] = useState<string>(DEFAULT_MANGA_SRC);
+  const [zoom, setZoom] = useState<number>(1.0); // 👈 إضافة حالة الزووم المرفوعة للأعلى هنا
 
   // 📥 كائن الصورة للتحميل الاحتياطي على الهواتف الذكية ونظام Capacitor
   const [fallbackFile, setFallbackFile] = useState<{ url: string; blob: Blob; filename: string } | null>(null);
@@ -798,7 +799,7 @@ export default function App() {
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه الخطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -3510,7 +3511,7 @@ export default function App() {
           wandDimensions={wandDimensions}
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={setActiveLayer}
+          onSetActiveLayer={onSetActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onAddSelectionBounds={(bounds) => {
             setSelectionBox({
@@ -3551,7 +3552,7 @@ export default function App() {
         <LayersPanel
           layers={currentLayers}
           activeLayer={activeLayer}
-          onSetActiveLayer={setActiveLayer}
+          onSetActiveLayer={onSetActiveLayer}
           onUpdateLayer={handleUpdateLayer}
           onDeleteLayer={handleDeleteLayer}
           onUndo={handleUndo}
@@ -3725,7 +3726,7 @@ export default function App() {
                 <select
                   value={editFormFamily}
                   onChange={e => setEditFormFamily(e.target.value)}
-                  className="w-48 bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2 py-1 text-xs outline-none"
+                  className="w-48 bg-[#2d2d2d] border border-[#3c3c3c] text-white rounded px-2.5 py-1.5 text-xs outline-none"
                 >
                   {allFontsList.map(f => (
                     <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.name}</option>
@@ -3852,7 +3853,7 @@ export default function App() {
                 className="w-full bg-[#151515] border border-[#2d2d2d] text-white rounded px-2.5 py-1.5 text-xs outline-none focus:border-[#007acc]"
               />
               <p className="text-[10px] text-gray-500 leading-normal">
-                (اختياري) حدد وسوم الأسطر مفصولة بمسافة. إذا بدأ السطر في النص المترجم بإحدى هذه العلامات، فسيتم تنشيط هذا النمط التنسيقي تلقائياً عند تحديد السطر.
+                (اختياري) حدد وسوم الأسطر مفصولة بمسافة. إذا بدأ السطر في النص المترجم بإحدى هذه العلامات, فسيتم تنشيط هذا النمط التنسيقي تلقائياً عند تحديد السطر.
               </p>
             </div>
 
