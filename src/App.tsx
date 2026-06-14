@@ -530,7 +530,7 @@ export default function App() {
     }
   };
 
-  // مزامنة المتغير والأنماط بناءً على التغيير في التنسيق المحدد
+  // مزامنة المتغيرات والأنماط بناءً على التغيير في التنسيق المحدد
   useEffect(() => {
     let style: TextStyle | null = null;
     folders.forEach(f => {
@@ -798,7 +798,7 @@ export default function App() {
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه الخطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -4071,3 +4071,4 @@ export default function App() {
     </div>
   );
 }
+
