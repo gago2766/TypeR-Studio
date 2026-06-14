@@ -86,6 +86,13 @@ export function FloatingToolbar({
     });
   };
 
+  const currentSize = parseInt(style.fontSize) || 16;
+
+  const handleSizeChange = (amount: number) => {
+    const newSize = Math.max(1, Math.min(100, currentSize + amount));
+    handleStyleChange({ fontSize: `${newSize}px` });
+  };
+
   // 🎯 فلترة الخطوط لإظهار المفضلة فقط مع إبقاء خط الفقاعة النشط حالياً لتجنب الاختيار التلقائي العشوائي
   const filteredFonts = favFonts && favFonts.length > 0
     ? allFonts.filter(f => favFonts.includes(f.value) || f.value === style.fontFamily)
@@ -100,17 +107,50 @@ export function FloatingToolbar({
       className="fixed z-[99999] flex items-center gap-2 bg-[#1e1e1e] border border-[#3a3a3a] rounded-lg p-1.5 shadow-2xl text-xs text-gray-300 max-w-[95vw] overflow-x-auto select-none backdrop-blur-md transition-all duration-75 animate-in fade-in zoom-in-95 duration-100"
     >
       <span className="text-[10px] text-gray-400 font-medium px-1">حجم</span>
-      <input
-        type="number"
-        min="6"
-        max="120"
-        value={parseInt(style.fontSize) || 16}
-        onChange={e => {
-          const val = e.target.value ? `${e.target.value}px` : '16px';
-          handleStyleChange({ fontSize: val });
-        }}
-        className="w-12 bg-[#2a2a2a] border border-[#444] text-white rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:border-[#007acc]"
-      />
+      
+      {/* حاوية الحجم مع أزرار التحكم ومربع الإدخال المقيد بـ 100 */}
+      <div className="flex items-center gap-1 bg-[#2a2a2a] border border-[#444] rounded p-0.5">
+        <button
+          type="button"
+          onClick={() => handleSizeChange(-1)}
+          className="w-5 h-5 flex items-center justify-center bg-[#333] hover:bg-[#444] active:scale-95 text-gray-300 rounded font-bold transition focus:outline-none cursor-pointer text-xs"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          min="1"
+          max="100"
+          value={parseInt(style.fontSize) || ""}
+          onChange={e => {
+            const rawVal = e.target.value;
+            if (rawVal === '') {
+              handleStyleChange({ fontSize: '' });
+              return;
+            }
+            let valNum = parseInt(rawVal);
+            if (valNum > 100) valNum = 100;
+            if (valNum < 1) valNum = 1;
+            handleStyleChange({ fontSize: `${valNum}px` });
+          }}
+          onBlur={() => {
+            const size = parseInt(style.fontSize);
+            if (isNaN(size) || size < 1) {
+              handleStyleChange({ fontSize: '1px' });
+            } else if (size > 100) {
+              handleStyleChange({ fontSize: '100px' });
+            }
+          }}
+          className="w-8 bg-transparent text-white text-xs text-center focus:outline-none border-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <button
+          type="button"
+          onClick={() => handleSizeChange(1)}
+          className="w-5 h-5 flex items-center justify-center bg-[#333] hover:bg-[#444] active:scale-95 text-gray-300 rounded font-bold transition focus:outline-none cursor-pointer text-xs"
+        >
+          +
+        </button>
+      </div>
 
       <span className="text-[10px] text-gray-400 font-medium px-0.5">خط</span>
       <select
@@ -133,7 +173,7 @@ export function FloatingToolbar({
         ★
       </button>
 
-      {/* متحكم جديد لتحديد عدد أسطر الفقاعة من 1 إلى 10 */}
+      {/* متحكم تحديد عدد أسطر الفقاعة */}
       <span className="text-[10px] text-gray-400 font-medium px-1">أسطر</span>
       <select
         value={activeLayer.lineCountOverride || ""}
