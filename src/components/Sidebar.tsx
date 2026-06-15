@@ -105,10 +105,6 @@ interface SidebarProps {
   // Folder and Style modifications
   onDeleteFolder?: (folderId: string) => void;
   onEditStyle?: (style: TextStyle, folderId: string) => void;
-
-  // 📏 خيارات هامش الأمان الإضافية
-  bubbleMargin?: number;
-  setBubbleMargin?: (val: number) => void;
 }
 
 export function Sidebar({
@@ -192,8 +188,6 @@ export function Sidebar({
   onSelectBubbleShape,
   onDeleteFolder,
   onEditStyle,
-  bubbleMargin = 10,
-  setBubbleMargin,
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -944,33 +938,6 @@ export function Sidebar({
           >
             تطبيق التنسيق على العنصر المحدد
           </button>
-
-          {/* 📏 خيار إعدادات الهامش التفاعلي الجديد بـ 3 خيارات */}
-          {setBubbleMargin !== undefined && (
-            <div className="flex flex-col gap-2 border-t border-[#2d2d2d] pt-3 mt-1">
-              <span className="text-[10px] text-gray-400 font-bold">هامش أمان أسطر الفقاعة:</span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { val: 5,  label: '5% ضيق' },
-                  { val: 10, label: '10% متوسط' },
-                  { val: 15, label: '15% واسع' },
-                ].map(({ val, label }) => (
-                  <label key={val} className="flex items-center gap-1 justify-center cursor-pointer bg-[#1e1e1e] border border-[#2d2d2d] rounded px-1.5 py-1 hover:border-[#007acc] transition">
-                    <input
-                      type="radio"
-                      name="sidebar_bubble_margin_setting"
-                      checked={bubbleMargin === val}
-                      onChange={() => {
-                        setBubbleMargin(val);
-                      }}
-                      className="accent-[#007acc] scale-90"
-                    />
-                    <span className="text-[9.5px] text-gray-300 font-semibold">{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
 
