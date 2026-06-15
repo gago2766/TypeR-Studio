@@ -102,7 +102,7 @@ export default function App() {
   const [pages, setPages] = useState<MangaPage[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(-1);
   const [mangaSrc, setMangaSrc] = useState<string>(DEFAULT_MANGA_SRC);
-  const [zoom, setZoom] = useState<number>(1.0); // 👈 تفعيل حالة الزووم المشتركة هنا
+  const [zoom, setZoom] = useState<number>(1.0);
 
   // 📥 كائن الصورة للتحميل الاحتياطي على الهواتف الذكية ونظام Capacitor
   const [fallbackFile, setFallbackFile] = useState<{ url: string; blob: Blob; filename: string } | null>(null);
@@ -799,7 +799,7 @@ export default function App() {
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه الخطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -2511,7 +2511,7 @@ export default function App() {
     pushToHistory(prevLayers);
     setBubbleQueue([]);
     clearWandSelection();
-    addToast(`✓ تم توزيع ولصق النص على عدد ${pasteCount} فقاعات دفعة واحدة`, 'success');
+    addToast(`✓ تم توزيع ولصق النص على عدد {pasteCount} فقاعات دفعة واحدة`, 'success');
   };
 
   // تبييض الفقاعات المتعددة المكتشفة تلقائياً بلونها الأصلي
@@ -3330,6 +3330,20 @@ export default function App() {
               <div className="flex justify-between items-center border-t border-[#2d2d2d] pt-3 mt-1">
                 <span>هامش أمان أسطر الفقاعة:</span>
                 <div className="flex items-center gap-3">
+                  {/* 📏 إضافة خيار 5% ضيق بجانب الخيارات الأخرى لتعديله من الإعدادات */}
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="bubble_margin_setting"
+                      checked={bubbleMargin === 5}
+                      onChange={() => {
+                        setBubbleMargin(5);
+                        addToast('✓ تم تحديد هامش أمان 5% (ضيق) 📏', 'success');
+                      }}
+                      className="accent-[#007acc]"
+                    />
+                    <span>5% (ضيق)</span>
+                  </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
@@ -3337,11 +3351,11 @@ export default function App() {
                       checked={bubbleMargin === 10}
                       onChange={() => {
                         setBubbleMargin(10);
-                        addToast('✓ تم تحديد هامش أمان 10% 📏', 'success');
+                        addToast('✓ تم تحديد هامش أمان 10% (افتراضي) 📏', 'success');
                       }}
                       className="accent-[#007acc]"
                     />
-                    <span>10% (افتراضي)</span>
+                    <span>10%</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -3688,7 +3702,6 @@ export default function App() {
         onSelectBubbleShape={handleSelectBubbleShape}
         onDeleteFolder={handleDeleteFolder} // 👈 ربط دالة حذف المجلدات
         onEditStyle={handleOpenEditStyle} // 👈 ربط دالة فتح شاشة التعديل
-        setBubbleMargin={setBubbleMargin} // 👈 تم التمرير لربط دالة تعديل الهامش
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
