@@ -78,13 +78,6 @@ function splitWord(word: string) {
   return { prefix, core, suffix };
 }
 
-/**
- * تمطيط خفيف وجمالي لسطر واحد
- * - يعمل فقط عندما يكون السطر أقصر من الحد بنسبة 22% أو أكثر
- * - يختار أطول الكلمات أولاً للتوزيع الأجمل
- * - حد أقصى كشيدتان لكل كلمة
- * - يتوقف عند 90% من العرض المتاح
- */
 export function tatweelLineLight(
   line: string,
   targetWidth: number,
@@ -145,9 +138,6 @@ export function tatweelLineLight(
   return currentWords.join(' ');
 }
 
-/**
- * التمطيط اليدوي الكامل (زر التمطيط اليدوي فقط)
- */
 export function tatweelLine(
   text: string,
   targetWidth: number,
@@ -198,6 +188,123 @@ export function tatweelLine(
 }
 
 // =====================================================
+// 🆕 قياس المساحة القابلة للكتابة الفعلية من القناع
+// =====================================================
+
+/**
+ * يحلّل القناع الثنائي (wandMask) لاستخراج:
+ * - عرض قابل للكتابة عند كل صف (لكل Y)
+ * - المستطيل الداخلي الأمثل (أكبر مستطيل يتسع داخل الفقاعة)
+ * - إحداثيات المركز الحقيقي للفقاعة
+ *
+ * هذه البيانات تُستخدم لضبط هامش الأمان بدقة بناءً على الشكل الفعلي
+ * بدلاً من نسبة ثابتة تُطبَّق على المستطيل المحيط (bounding box).
+ */
+export interface BubbleMetrics {
+  /** المستطيل الداخلي الأمثل الذي يتسع كاملاً داخل الفقاعة (بكسل الصورة) */
+  innerRect: { x: number; y: number; w: number; h: number };
+  /** مركز الفقاعة الحقيقي (بكسل الصورة) */
+  centerX: number;
+  centerY: number;
+  /** متوسط عرض السطر على طول الفقاعة (لتقدير الكثافة) */
+  avgLineWidth: number;
+  /** نسبة المساحة المفيدة إلى مساحة bounding box (0-1) */
+  fillRatio: number;
+}
+
+export function measureBubbleFromMask(
+  mask: Uint8Array,
+  imgW: number,
+  imgH: number,
+  bboxX: number,
+  bboxY: number,
+  bboxW: number,
+  bboxH: number
+): BubbleMetrics {
+  const maxX = bboxX + bboxW;
+  const maxY = bboxY + bboxH;
+
+  // 1. حساب عرض كل صف داخل الفقاعة
+  const rowWidths: number[] = [];
+  let totalPixels = 0;
+  let sumX = 0;
+  let sumY = 0;
+
+  for (let y = bboxY; y < maxY; y++) {
+    let rowStart = -1;
+    let rowEnd = -1;
+    for (let x = bboxX; x < maxX; x++) {
+      if (mask[y * imgW + x] === 1) {
+        if (rowStart === -1) rowStart = x;
+        rowEnd = x;
+        totalPixels++;
+        sumX += x;
+        sumY += y;
+      }
+    }
+    if (rowStart !== -1) {
+      rowWidths.push(rowEnd - rowStart + 1);
+    } else {
+      rowWidths.push(0);
+    }
+  }
+
+  const centerX = totalPixels > 0 ? sumX / totalPixels : bboxX + bboxW / 2;
+  const centerY = totalPixels > 0 ? sumY / totalPixels : bboxY + bboxH / 2;
+  const fillRatio = totalPixels / (bboxW * bboxH);
+
+  // 2. إيجاد أكبر مستطيل داخلي يتناسب مع نسبة 3:4 (مناسبة للنصوص)
+  // نستخدم خوارزمية sliding window: نحاول ارتفاعات مختلفة ونجد أوسع نافذة
+  const avgLineWidth = rowWidths.reduce((a, b) => a + b, 0) / (rowWidths.length || 1);
+
+  // نجد المستطيل الأمثل بالبحث عن أكبر نافذة أفقية x ارتفاع
+  let bestRect = { x: bboxX, y: bboxY, w: bboxW, h: bboxH };
+  let bestArea = 0;
+
+  // نحاول كل ارتفاع من 30% إلى 90% من الارتفاع الكلي
+  const minH = Math.floor(bboxH * 0.3);
+  const maxH2 = Math.floor(bboxH * 0.92);
+  const step = Math.max(1, Math.floor(bboxH / 20));
+
+  for (let h = minH; h <= maxH2; h += step) {
+    // نحرك النافذة من الأعلى للأسفل
+    for (let startRow = 0; startRow + h <= bboxH; startRow += Math.max(1, step / 2)) {
+      // أدنى عرض في هذه النافذة
+      let minW = Infinity;
+      for (let r = startRow; r < startRow + h; r++) {
+        if (r < rowWidths.length) {
+          minW = Math.min(minW, rowWidths[r]);
+        }
+      }
+      if (!isFinite(minW) || minW < 10) continue;
+
+      const area = minW * h;
+      if (area > bestArea) {
+        bestArea = area;
+        // نحتاج لإيجاد x الفعلي لهذا العرض في هذه النافذة
+        // نأخذ متوسط مراكز الصفوف في النافذة
+        let midX = centerX;
+        const rectX = Math.round(midX - minW / 2);
+        bestRect = {
+          x: Math.max(bboxX, rectX),
+          y: bboxY + startRow,
+          w: minW,
+          h,
+        };
+      }
+    }
+  }
+
+  return {
+    innerRect: bestRect,
+    centerX,
+    centerY,
+    avgLineWidth,
+    fillRatio,
+  };
+}
+
+// =====================================================
 // نسب عرض الأسطر لكل شكل فقاعة
 // =====================================================
 
@@ -222,25 +329,32 @@ function getLineWidthRatio(
 }
 
 // =====================================================
-// حساب الأبعاد الدقيقة للفقاعة بعد تطبيق الهامش
-// يُستخدم في App.tsx عند التحديد بالعصا السحرية
+// 🆕 حساب أبعاد صندوق النص المحسّن بالقناع الفعلي
 // =====================================================
 
 /**
- * يحسب أبعاد صندوق النص الداخلي بناءً على أبعاد الفقاعة الخام ونسبة الهامش
- * marginPercent: 5 أو 10 أو 15
- * scaleX/scaleY: نسبة تحويل بكسل الصورة ← بكسل الشاشة
+ * النسخة المحسّنة من computeLayerBoundsFromWand:
+ * تستخدم القناع الثنائي (إن توفّر) لحساب أبعاد صندوق النص
+ * بناءً على المساحة الداخلية الفعلية للفقاعة بدلاً من نسبة هامش ثابتة.
+ *
+ * - إذا توفّر القناع: تستخرج المستطيل الداخلي الأمثل وتمركز النص فيه
+ * - إذا لم يتوفّر: تعود للطريقة القديمة (الهامش الثابت) كـ fallback آمن
  */
 export function computeLayerBoundsFromWand(params: {
-  bboxX: number;      // x بكسل الصورة
-  bboxY: number;      // y بكسل الصورة
-  bboxW: number;      // عرض الفقاعة بكسل الصورة
-  bboxH: number;      // ارتفاع الفقاعة بكسل الصورة
-  scaleX: number;     // imgWidth / dispWidth
-  scaleY: number;     // imgHeight / dispHeight
-  marginPercent: number; // 5 أو 10 أو 15
+  bboxX: number;
+  bboxY: number;
+  bboxW: number;
+  bboxH: number;
+  scaleX: number;
+  scaleY: number;
+  marginPercent: number;
+  // 🆕 معاملات اختيارية للقياس الدقيق بالقناع
+  mask?: Uint8Array | null;
+  imgW?: number;
+  imgH?: number;
+  bubbleType?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval' | null;
 }): { left: number; top: number; width: number; height: number } {
-  const { bboxX, bboxY, bboxW, bboxH, scaleX, scaleY, marginPercent } = params;
+  const { bboxX, bboxY, bboxW, bboxH, scaleX, scaleY, marginPercent, mask, imgW, imgH, bubbleType } = params;
 
   // تحويل من بكسل الصورة إلى بكسل الشاشة
   const dispX = bboxX / scaleX;
@@ -248,8 +362,61 @@ export function computeLayerBoundsFromWand(params: {
   const dispW = bboxW / scaleX;
   const dispH = bboxH / scaleY;
 
-  // تطبيق الهامش بشكل مستقل على المحورين
-  // الهامش الأفقي والرأسي يُحسب كنسبة من البُعد الأصغر لحماية أشكال المستطيلات الطويلة
+  // ── مسار القناع الدقيق ──────────────────────────────────────────────────
+  if (mask && imgW && imgH && bboxW > 0 && bboxH > 0) {
+    const metrics = measureBubbleFromMask(mask, imgW, imgH, bboxX, bboxY, bboxW, bboxH);
+    const { innerRect, fillRatio } = metrics;
+
+    // تحويل المستطيل الداخلي لإحداثيات الشاشة
+    const innerDispX = innerRect.x / scaleX;
+    const innerDispY = innerRect.y / scaleY;
+    const innerDispW = innerRect.w / scaleX;
+    const innerDispH = innerRect.h / scaleY;
+
+    // هامش أمان ديناميكي بناءً على شكل الفقاعة ونسبة ملئها
+    // الفقاعات المستطيلة (fillRatio قريب من 1) تحتاج هامشاً أصغر
+    // الفقاعات البيضاوية والسحابية تحتاج هامشاً أكبر عند الأطراف
+    let dynamicMarginX: number;
+    let dynamicMarginY: number;
+
+    if (bubbleType === 'narrative_box' || fillRatio > 0.88) {
+      // صندوق مستطيل: هامش بسيط جداً
+      dynamicMarginX = innerDispW * 0.04;
+      dynamicMarginY = innerDispH * 0.04;
+    } else if (bubbleType === 'spiky_shout') {
+      // صراخ: الخطوط الشوكية تدخل داخل الـ bbox لكن المساحة الداخلية محسوبة بدقة
+      dynamicMarginX = innerDispW * 0.05;
+      dynamicMarginY = innerDispH * 0.06;
+    } else if (bubbleType === 'thought_cloud') {
+      // سحابة تفكير: حواف منحنية كثيرة
+      dynamicMarginX = innerDispW * 0.07;
+      dynamicMarginY = innerDispH * 0.07;
+    } else {
+      // بيضاوية عادية أو رأسية: الهامش يعتمد على نسبة الملء
+      // كلما كانت الفقاعة أكثر استدارة، كلما احتاج النص مساحة مركزية أوسع
+      const fillFactor = Math.max(0, Math.min(1, (fillRatio - 0.5) / 0.4));
+      dynamicMarginX = innerDispW * (0.04 + 0.04 * (1 - fillFactor));
+      dynamicMarginY = innerDispH * (0.04 + 0.04 * (1 - fillFactor));
+    }
+
+    const finalW = Math.max(20, innerDispW - dynamicMarginX * 2);
+    const finalH = Math.max(20, innerDispH - dynamicMarginY * 2);
+
+    // تمركز صندوق النص في مركز الفقاعة الحقيقي
+    const trueCenterX = metrics.centerX / scaleX;
+    const trueCenterY = metrics.centerY / scaleY;
+    const finalLeft = trueCenterX - finalW / 2;
+    const finalTop  = trueCenterY - finalH / 2;
+
+    return {
+      left:   Math.round(finalLeft),
+      top:    Math.round(finalTop),
+      width:  Math.round(finalW),
+      height: Math.round(finalH),
+    };
+  }
+
+  // ── مسار الهامش الثابت (fallback) ─────────────────────────────────────
   const marginRatio = marginPercent / 100;
   const padX = dispW * marginRatio;
   const padY = dispH * marginRatio;
@@ -343,7 +510,6 @@ export function wrapTextToShape(
 
   const unstretchedLines = [...bestLines];
 
-  // تمطيط خفيف على أول سطر وآخر سطر فقط (إذا كان هناك سطران أو أكثر)
   const stretchedLines = bestLines.map((line, idx) => {
     if (bestLines.length < 2) return line;
     const isFirst = idx === 0;
