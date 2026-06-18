@@ -436,9 +436,9 @@ export function Workspace({
           const clickY = (touch.clientY - rect.top) / zoom;
 
           const left = Math.min(startPos.x, clickX);
-          const top = Math.min(startPos.y, currentY);
+          const top = Math.min(startPos.y, clickY); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
           const width = Math.abs(clickX - startPos.x);
-          const height = Math.abs(currentY - startPos.y);
+          const height = Math.abs(clickY - startPos.y); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
 
           setSelectionBox({
             left,
