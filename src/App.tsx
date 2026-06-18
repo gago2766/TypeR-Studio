@@ -259,6 +259,7 @@ export default function App() {
     seedColor?: string; // تبييض الفقاعات بلونها الأصلي
     imgW?: number;   // 🆕
     imgH?: number;   // 🆕
+    edgeSegments?: Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>; // 🆕 حفظ مسارات الحواف للتلوين الجماعي الدائم
   }>>([]);
 
   // إعدادات العلامة المائية
@@ -1410,8 +1411,9 @@ export default function App() {
         shape: bType,
         mask: mask,
         seedColor: hexColor, // 👈 تبييض الفقاعات المتعددة بلونها الأصلي
-        imgW,   // 🆕
-        imgH,   // 🆕
+        imgW,
+        imgH,
+        edgeSegments: segments, // 🆕 حفظ مسارات الحواف للتظليل الجماعي الدائم
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
     } else {
@@ -1421,64 +1423,122 @@ export default function App() {
     }
   };
 
-  // تأثير الرسوم المتحركة لمسارات قناع العصا السحرية
+  // تأثير الرسوم المتحركة لمسارات قناع العصا السحرية (محدث لدعم التلوين الجماعي الدائم للتحديد المتعدد)
   useEffect(() => {
-    if (!wandMask || !edgeSegments.length || !wandDimensions) return;
-
     const canvas = wandCanvasRef.current;
     if (!canvas) return;
+
+    // إذا لم يكن هناك تحديد نشط ولا توجد فقاعات في طابور التحديد المتعدد، نقوم بمسح الكانفاس والرجوع
+    if (!wandMask && bubbleQueue.length === 0) {
+      canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { imgW, imgH, dispW, dispH, x: minX, y: minY, w: foundW, h: hSize } = wandDimensions;
+    // جلب أبعاد الصورة التناسبية من أول عنصر متاح (إما التحديد النشط أو طابور التحديد)
+    const activeDimensions = wandDimensions || (bubbleQueue.length > 0 ? {
+      imgW: bubbleQueue[0].imgW || 600,
+      imgH: bubbleQueue[0].imgH || 800,
+      dispW: canvas.width,
+      dispH: canvas.height,
+    } : null);
+
+    if (!activeDimensions) return;
+
+    const { imgW, imgH, dispW, dispH } = activeDimensions;
     const dsx = dispW / imgW;
     const dsy = dispH / imgH;
 
     const tick = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // 1. تجميع تظليل القناع الشفاف الأزرق لكافة الفقاعات النشطة والقديمة بالصف
       const id = ctx.createImageData(canvas.width, canvas.height);
       const d = id.data;
-      const maxY = minY + hSize;
-      const maxX = minX + foundW;
 
-      for (let y = minY; y <= maxY; y++) {
-        const row = y * imgW;
-        for (let x = minX; x <= maxX; x++) {
-          if (!wandMask[row + x]) continue;
-          const dx = Math.round(x * dsx);
-          const dy = Math.round(y * dsy);
-          if (dx < 0 || dx >= canvas.width || dy < 0 || dy >= canvas.height) continue;
-          const di = (dy * canvas.width + dx) * 4;
-          d[di] = 0;
-          d[di + 1] = 160;
-          d[di + 2] = 255;
-          d[di + 3] = 45;
+      const drawPixelToData = (x: number, y: number, r = 0, g = 160, b = 255, a = 45) => {
+        const dx = Math.round(x * dsx);
+        const dy = Math.round(y * dsy);
+        if (dx < 0 || dx >= canvas.width || dy < 0 || dy >= canvas.height) return;
+        const di = (dy * canvas.width + dx) * 4;
+        d[di] = r;
+        d[di + 1] = g;
+        d[di + 2] = b;
+        d[di + 3] = a;
+      };
+
+      // رسم تظليل القناع النشط الحالي
+      if (wandMask && wandDimensions) {
+        const { x: minX, y: minY, w: foundW, h: hSize } = wandDimensions;
+        const maxY = minY + hSize;
+        const maxX = minX + foundW;
+        for (let y = minY; y <= maxY; y++) {
+          const row = y * imgW;
+          for (let x = minX; x <= maxX; x++) {
+            if (wandMask[row + x]) {
+              drawPixelToData(x, y);
+            }
+          }
         }
       }
+
+      // رسم تظليل أقنعة الفقاعات المحفوظة في طابور التحديد المتعدد
+      bubbleQueue.forEach(b => {
+        if (!b.mask) return;
+        const maxX = b.bboxX + b.bboxW;
+        const maxY = b.bboxY + b.bboxH;
+        for (let y = b.bboxY; y <= maxY; y++) {
+          const row = y * imgW;
+          for (let x = b.bboxX; x <= maxX; x++) {
+            if (b.mask[row + x]) {
+              // استخدام لون أخضر شفاف خفيف لتمييز الفقاعات المحفوظة بالطابور عن الفقاعة النشطة الحالية (زرقاء)
+              drawPixelToData(x, y, 76, 175, 80, 50); 
+            }
+          }
+        }
+      });
+
       ctx.putImageData(id, 0, 0);
 
+      // 2. رسم مسارات وحواف الخطوط المتقطعة (النمل الزاحف) لكافة الفقاعات
       ctx.save();
       ctx.lineWidth = 1.6;
-      ctx.strokeStyle = '#ffffff';
       ctx.setLineDash([5, 3]);
-      ctx.lineDashOffset = -matchOffsetRef.current;
-      ctx.beginPath();
-      edgeSegments.forEach(s => {
-        ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
-        ctx.lineTo(s.x2 * dsx, s.y2 * dsy);
-      });
-      ctx.stroke();
 
-      ctx.strokeStyle = '#000000';
-      ctx.lineDashOffset = -(matchOffsetRef.current + 4);
-      ctx.beginPath();
-      edgeSegments.forEach(s => {
-        ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
-        ctx.lineTo(s.x2 * dsx, s.y2 * dsy); // 👈 تم تصحيح الارتفاع بنجاح هنا
+      const drawEdges = (segments: Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>, isQueue = false) => {
+        ctx.strokeStyle = isQueue ? '#76d7c4' : '#ffffff'; // أبيض للنشط، تركوازي خفيف للطابور
+        ctx.lineDashOffset = -matchOffsetRef.current;
+        ctx.beginPath();
+        segments.forEach(s => {
+          ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
+          ctx.lineTo(s.x2 * dsx, s.y2 * dsy);
+        });
+        ctx.stroke();
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineDashOffset = -(matchOffsetRef.current + 4);
+        ctx.beginPath();
+        segments.forEach(s => {
+          ctx.moveTo(s.x1 * dsx, s.y1 * dsy);
+          ctx.lineTo(s.x2 * dsx, s.y2 * dsy);
+        });
+        ctx.stroke();
+      };
+
+      // رسم حواف الفقاعة النشطة
+      if (edgeSegments.length > 0) {
+        drawEdges(edgeSegments, false);
+      }
+
+      // رسم حواف الفقاعات بالطابور
+      bubbleQueue.forEach(b => {
+        if (b.edgeSegments && b.edgeSegments.length > 0) {
+          drawEdges(b.edgeSegments, true);
+        }
       });
-      ctx.stroke();
+
       ctx.restore();
 
       matchOffsetRef.current = (matchOffsetRef.current + 0.45) % 8;
@@ -1489,7 +1549,7 @@ export default function App() {
     return () => {
       if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
     };
-  }, [wandMask, edgeSegments, wandDimensions]);
+  }, [wandMask, edgeSegments, wandDimensions, bubbleQueue]);
 
   // إدراج النصوص والترجمة بالفقاعة المحددة
   const handleInsertText = () => {
@@ -2620,7 +2680,7 @@ export default function App() {
         let finalFontSize = opt.fontSize;
         activeText = opt.textWithBreaks;
 
-        // 🆕 تطبيق القيود الذكية لصف الفقاعات
+        // 🆕 تطبيق القيود الذكية لصف الفقاعات لمنع تضخم الحجم
         if (activeFontSize !== 'auto') {
           const userCap = parseFloat(activeFontSize);
           if (!isNaN(userCap) && finalFontSize > userCap) {
@@ -3034,7 +3094,7 @@ export default function App() {
             "This is a manga page and a black-and-white mask indicating the areas with text or artifacts to be removed. Please erase the text in the white areas of the mask, and seamlessly reconstruct the background texture, drawings, or speech bubbles underneath. Return only the final edited page as an image output."
           ],
           config: {
-            responseModalities: ["IMAGE"]
+            responseModalalities: ["IMAGE"]
           }
         });
 
