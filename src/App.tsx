@@ -257,6 +257,8 @@ export default function App() {
     shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval'; // 👈 بيضاوية رأسية
     mask?: Uint8Array;
     seedColor?: string; // تبييض الفقاعات بلونها الأصلي
+    imgW?: number;   // 🆕
+    imgH?: number;   // 🆕
   }>>([]);
 
   // إعدادات العلامة المائية
@@ -556,7 +558,7 @@ export default function App() {
 
   const currentLayers = pages[currentPageIndex]?.layers || [];
 
-  // 💾 دالة التقاط لقطة حالية للطبقات والرسم لتضمينها في عمليات التراجع
+  // 💾 السجل الموحد لكل صفحة: لقطات الطبقات والرسم معاً للتراجع الموحد والكامل
   const pushSnapshot = (customLayers?: MangaLayer[], customCleaningUrl?: string) => {
     if (currentPageIndex === -1) return;
     const activeLayers = customLayers !== undefined ? customLayers : [...currentLayers];
@@ -1320,6 +1322,10 @@ export default function App() {
           scaleX,
           scaleY,
           marginPercent: bubbleMargin,
+          mask,       // 🆕 القناع الثنائي للقياس الدقيق
+          imgW,       // 🆕 أبعاد الصورة الأصلية
+          imgH,       // 🆕 أبعاد الصورة الأصلية
+          bubbleType: bType, // 🆕 نوع الفقاعة المكتشف
         });
 
       const opt = calculateOptimalFontSizeForShape(
@@ -1362,6 +1368,8 @@ export default function App() {
         shape: bType,
         mask: mask,
         seedColor: hexColor, // 👈 تبييض الفقاعات المتعددة بلونها الأصلي
+        imgW,   // 🆕
+        imgH,   // 🆕
       }]);
       addToast('أضيفت الفقاعة إلى قائمة الإدراج المتتابع', 'success');
     } else {
@@ -1490,6 +1498,10 @@ export default function App() {
         scaleX,
         scaleY,
         marginPercent: bubbleMargin,
+        mask: wandMask,           // 🆕
+        imgW: wandDimensions.imgW, // 🆕
+        imgH: wandDimensions.imgH, // 🆕
+        bubbleType: detectedBubbleType, // 🆕
       });
       layerLeft   = bounds.left;
       layerTop    = bounds.top;
@@ -1626,6 +1638,10 @@ export default function App() {
         scaleX,
         scaleY,
         marginPercent: bubbleMargin,
+        mask: wandMask,            // 🆕
+        imgW: wandDimensions.imgW, // 🆕
+        imgH: wandDimensions.imgH, // 🆕
+        bubbleType: detectedBubbleType, // 🆕
       });
       layerLeft   = bounds.left;
       layerTop    = bounds.top;
@@ -2443,6 +2459,10 @@ export default function App() {
           scaleX: b.scaleX,
           scaleY: b.scaleY,
           marginPercent: bubbleMargin,
+          mask: b.mask,    // 🆕 القناع محفوظ بالفعل في bubbleQueue
+          imgW: b.imgW,    // 🆕 يجب إضافة imgW وimgH لـ bubbleQueue state
+          imgH: b.imgH,    // 🆕
+          bubbleType: b.shape, // 🆕 الشكل محفوظ بالفعل
         });
 
       let activeText = lineText;
@@ -3960,4 +3980,3 @@ export default function App() {
     </div>
   );
 }
-
