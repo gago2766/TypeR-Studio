@@ -36,9 +36,23 @@ export interface LayerStyle {
   bgColor: string;
 }
 
+// 🆕 تعريف هيكلية نقاط الرسم المتجه لأداة الـ Pen Tool لدعم المنحنيات
+export interface PenPoint {
+  x: number;
+  y: number;
+  handleIn?: { x: number; y: number };  // مقبض التحكم بالانحناء الداخلي
+  handleOut?: { x: number; y: number }; // مقبض التحكم بالانحناء الخارجي
+}
+
 export interface MangaLayer {
   id: string;
-  text: string;
+  type?: 'text' | 'image' | 'path'; // 🆕 نوع الطبقة: نص (افتراضي)، صورة مرفوعة، أو مسار Pen Tool متقاطع
+  text: string;                     // لنصوص طبقة الـ 'text'
+  imageSrc?: string;                // مسار الصورة المرفوعة لطبقة الـ 'image' 🆕
+  pathPoints?: PenPoint[];          // نقاط مسار الـ Pen Tool لطبقة الـ 'path' 🆕
+  strokeColor?: string;             // لون خط تحديد الـ Pen Tool 🆕
+  fillColor?: string;               // لون تعبئة مسار الـ Pen Tool المغلق 🆕
+  strokeWidth?: number;             // سمك خط الـ Pen Tool 🆕
   left: string;
   top: string;
   width: string;
