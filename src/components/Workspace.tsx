@@ -4,9 +4,9 @@ import { calculateOptimalFontSize } from '../utils';
 
 interface WorkspaceProps {
   mangaSrc: string;
-  activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand';
-  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void; // 👈 نُبقيها في الواجهة لتجنب أخطاء TypeScript
-  wandDimensions: { imgW: number; imgH: number; dispW: number; dispH: number; x: number; y: number; w: number; h: number } | null; // 👈 نُبقيها في الواجهة لتجنب أخطاء TypeScript
+  activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand' | 'pen'; // 🆕 إضافة 'pen' لقائمة الأدوات
+  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand' | 'pen') => void;
+  wandDimensions: { imgW: number; imgH: number; dispW: number; dispH: number; x: number; y: number; w: number; h: number } | null;
   layers: MangaLayer[];
   activeLayer: MangaLayer | null;
   onSetActiveLayer: (layer: MangaLayer | null) => void;
@@ -44,6 +44,9 @@ interface WorkspaceProps {
   // 📐 استقبال قيم التحكم بالزووم المرفوعة للأعلى لربطها بالشريط العلوي
   zoom: number;
   setZoom: React.Dispatch<React.SetStateAction<number>>;
+
+  // 🆕 دالة لإضافة طبقة القلم المرسومة
+  onAddPenLayer?: (points: Array<{ x: number; y: number }>, isClosed: boolean) => void;
 }
 
 export function Workspace({
@@ -86,13 +89,16 @@ export function Workspace({
   // استقبال الخواص الجديدة للزووم
   zoom,
   setZoom,
+
+  // 🆕
+  onAddPenLayer,
 }: WorkspaceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageWrapperRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const lastDrawnUrlRef = useRef<string>('');
 
-  // Zoom & Pan states (تم رفع حالة الـ zoom للأعلى كـ Prop)
+  // Zoom & Pan states
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number; scrollLeft: number; scrollTop: number }>({
     x: 0,
@@ -104,6 +110,9 @@ export function Workspace({
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+
+  // 📐 حالة تخزين نقاط مسار القلم النشط أثناء الرسم يدوياً
+  const [penPoints, setPenPoints] = useState<Array<{ x: number; y: number }>>([]);
 
   // 📐 حالة تخزين وتتبع خطوط الإرشاد وحواف الفقاعة النشطة
   const [guides, setGuides] = useState<{
@@ -238,6 +247,25 @@ export function Workspace({
     };
   }, []);
 
+  // دالة تجميع نقاط الرسم لإنشاء السلسلة النصية لمسار الـ SVG
+  const buildSvgPath = (points: Array<{ x: number; y: number }>) => {
+    if (!points || points.length === 0) return '';
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      d += ` L ${points[i].x} ${points[i].y}`;
+    }
+    return d;
+  };
+
+  // إنهاء مسار الـ Pen Tool وحفظه كطبقة متجهية
+  const handleFinalizePenPath = (isClosed: boolean) => {
+    if (penPoints.length < 2) return;
+    if (onAddPenLayer) {
+      onAddPenLayer(penPoints, isClosed);
+    }
+    setPenPoints([]);
+  };
+
   // نظام لمس احترافي متكامل للهواتف
   useEffect(() => {
     const container = containerRef.current;
@@ -290,6 +318,12 @@ export function Workspace({
         const rect = wrapper.getBoundingClientRect();
         const clickX = (touch.clientX - rect.left) / zoom;
         const clickY = (touch.clientY - rect.top) / zoom;
+
+        // 🆕 وضع اللمس وإضافة نقاط الـ Pen Tool بالضغط
+        if (activeTool === 'pen') {
+          setPenPoints(prev => [...prev, { x: clickX, y: clickY }]);
+          return;
+        }
 
         if (activeTool === 'magic_wand') {
           onWandSelect(clickX, clickY);
@@ -436,9 +470,9 @@ export function Workspace({
           const clickY = (touch.clientY - rect.top) / zoom;
 
           const left = Math.min(startPos.x, clickX);
-          const top = Math.min(startPos.y, clickY); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY الموثقة للماوس والتاتش
+          const top = Math.min(startPos.y, clickY); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
           const width = Math.abs(clickX - startPos.x);
-          const height = Math.abs(clickY - startPos.y); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY الموثقة للماوس والتاتش
+          const height = Math.abs(clickY - startPos.y); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
 
           setSelectionBox({
             left,
@@ -718,6 +752,13 @@ export function Workspace({
     const natX = clickX * scaleX;
     const natY = clickY * scaleY;
 
+    // 🆕 وضع الفأرة وإضافة نقاط الـ Pen Tool بالضغط
+    if (activeTool === 'pen') {
+      e.preventDefault();
+      setPenPoints(prev => [...prev, { x: clickX, y: clickY }]);
+      return;
+    }
+
     if (activeTool === 'clone_stamp' && isSettingStampSource) {
       setStampSource({ x: natX, y: natY });
       setIsSettingStampSource(false);
@@ -765,25 +806,23 @@ export function Workspace({
             ctx.lineJoin = 'round';
             ctx.lineTo(natX, natY);
             ctx.stroke();
-          } else if (activeTool === 'clone_stamp') {
-            if (stampSource) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(natX, natY, brushSize / 2, 0, Math.PI * 2);
-              ctx.clip();
-              ctx.drawImage(
-                img,
-                stampSource.x - brushSize / 2,
-                stampSource.y - brushSize / 2,
-                brushSize,
-                brushSize,
-                natX - brushSize / 2,
-                natY - brushSize / 2,
-                brushSize,
-                brushSize
-              );
-              ctx.restore();
-            }
+          } else if (activeTool === 'clone_stamp' && stampSource) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(natX, natY, brushSize / 2, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(
+              img,
+              stampSource.x - brushSize / 2,
+              stampSource.y - brushSize / 2,
+              brushSize,
+              brushSize,
+              natX - brushSize / 2,
+              natY - brushSize / 2,
+              brushSize,
+              brushSize
+            );
+            ctx.restore();
           }
         }
       }
@@ -854,32 +893,30 @@ export function Workspace({
             ctx.lineJoin = 'round';
             ctx.lineTo(natX, natY);
             ctx.stroke();
-          } else if (activeTool === 'clone_stamp') {
-            if (stampSource) {
-              const startNatX = startPos.x * scaleX;
-              const startNatY = startPos.y * scaleY;
-              const dx = natX - startNatX;
-              const dy = natY - startNatY;
-              const srcCurrX = stampSource.x + dx;
-              const srcCurrY = stampSource.y + dy;
+          } else if (activeTool === 'clone_stamp' && stampSource) {
+            const startNatX = startPos.x * scaleX;
+            const startNatY = startPos.y * scaleY;
+            const dx = natX - startNatX;
+            const dy = natY - startNatY;
+            const srcCurrX = stampSource.x + dx;
+            const srcCurrY = stampSource.y + dy;
 
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(natX, natY, brushSize / 2, 0, Math.PI * 2);
-              ctx.clip();
-              ctx.drawImage(
-                img,
-                srcCurrX - brushSize / 2,
-                srcCurrY - brushSize / 2,
-                brushSize,
-                brushSize,
-                natX - brushSize / 2,
-                natY - brushSize / 2,
-                brushSize,
-                brushSize
-              );
-              ctx.restore();
-            }
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(natX, natY, brushSize / 2, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(
+              img,
+              srcCurrX - brushSize / 2,
+              srcCurrY - brushSize / 2,
+              brushSize,
+              brushSize,
+              natX - brushSize / 2,
+              natY - brushSize / 2,
+              brushSize,
+              brushSize
+            );
+            ctx.restore();
           }
         }
       }
@@ -1163,7 +1200,7 @@ export function Workspace({
   ]);
 
   const handleLayerDragStart = (layer: MangaLayer, e: React.MouseEvent) => {
-    if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand'].includes(activeTool)) return;
+    if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand', 'pen'].includes(activeTool)) return; // 🆕 السماح بتجاهل السحب في وضع القلم
 
     const target = e.target as HTMLElement;
     if (
@@ -1187,7 +1224,7 @@ export function Workspace({
   };
 
   const handleLayerTouchStart = (layer: MangaLayer, e: React.TouchEvent) => {
-    if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand'].includes(activeTool)) return;
+    if (['brush', 'eraser', 'clone_stamp', 'color_picker', 'zoom', 'hand', 'pen'].includes(activeTool)) return; // 🆕
 
     const target = e.target as HTMLElement;
     if (
@@ -1290,6 +1327,68 @@ export function Workspace({
           className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
         />
 
+        {/* 🆕 رسم معاينة مسار القلم النشط أثناء إنشائه بالمسرح بضغطة زر */}
+        {activeTool === 'pen' && penPoints.length > 0 && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-40">
+            <path
+              d={buildSvgPath(penPoints)}
+              stroke={brushColor || '#007acc'}
+              strokeWidth={3}
+              fill="none"
+              strokeDasharray="4 4"
+            />
+            {penPoints.map((pt, idx) => (
+              <circle
+                key={idx}
+                cx={pt.x}
+                cy={pt.y}
+                r={5}
+                fill={idx === 0 ? '#ff3b30' : '#007acc'}
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (idx === 0 && penPoints.length > 2) {
+                    handleFinalizePenPath(true);
+                  }
+                }}
+              />
+            ))}
+          </svg>
+        )}
+
+        {/* 🆕 شريط التحكم العائم الخاص بأداة الـ Pen Tool */}
+        {activeTool === 'pen' && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1e1e1e]/95 border border-[#3c3c3c] rounded-lg px-3 py-2 flex items-center gap-3 z-50 shadow-2xl select-none">
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              ✒️ أداة القلم النشطة
+            </span>
+            <div className="w-[1px] h-4 bg-gray-700" />
+            <button
+              onClick={() => handleFinalizePenPath(false)}
+              disabled={penPoints.length < 2}
+              className="bg-[#007acc] hover:bg-[#0062a3] text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2.5 py-1 text-[11px] font-bold transition cursor-pointer"
+            >
+              ✓ رسم المسار
+            </button>
+            <button
+              onClick={() => handleFinalizePenPath(true)}
+              disabled={penPoints.length < 3}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2.5 py-1 text-[11px] font-bold transition cursor-pointer"
+            >
+              ☖ مسار مغلق (تعبئة)
+            </button>
+            <button
+              onClick={() => setPenPoints([])}
+              disabled={penPoints.length === 0}
+              className="bg-red-800/80 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2 py-1 text-[11px] font-bold transition cursor-pointer"
+            >
+              ✕ مسح
+            </button>
+          </div>
+        )}
+
         {/* Clone stamp visual anchor target */}
         {stampSource && imageRef.current && (
           <div
@@ -1357,7 +1456,7 @@ export function Workspace({
               }}
               className="absolute border border-dashed border-[#8e44ad]/40"
             />
-            {/* خط الإرشاد الرأسي عند التوسيط الأفقي التام مع السنتر */}
+            {/* line guides */}
             {guides.vertical !== null && (
               <div 
                 style={{
@@ -1368,7 +1467,6 @@ export function Workspace({
                 className="absolute border-l border-dashed border-[#007acc] w-0 -translate-x-1/2 flex items-center justify-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-[#007acc] before:rounded-full after:content-[''] after:w-1.5 after:h-1.5 after:bg-[#007acc] after:rounded-full after:absolute after:bottom-0"
               />
             )}
-            {/* خط الإرشاد الأفقي عند التوسيط العمودي التام مع السنتر */}
             {guides.horizontal !== null && (
               <div 
                 style={{
@@ -1437,34 +1535,70 @@ export function Workspace({
               }}
               className={`absolute cursor-move flex items-center justify-center text-center p-1 border border-transparent z-10 box-border hover:border-gray-400/60 text-layer ${
                 isActive ? 'z-30' : ''
-              }`} // 👈 🆕 تمت إعادة إضافة كلاس text-layer لدعم الحفظ التلقائي ومزامنة الخطوط الفورية
+              }`}
             >
+              {/* 🆕 رندرة طبقة صورة فوق صورة (Image Overlay) */}
+              {layer.type === 'image' && layer.imageSrc && (
+                <img
+                  src={layer.imageSrc}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    pointerEvents: 'none',
+                  }}
+                  alt="Overlay Layer"
+                />
+              )}
+
+              {/* 🆕 رندرة طبقة رسم القلم (Pen Tool Vector Path) */}
+              {layer.type === 'path' && layer.pathPoints && (
+                <svg 
+                  className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <path
+                    d={buildSvgPath(layer.pathPoints)}
+                    stroke={layer.strokeColor || '#000000'}
+                    strokeWidth={layer.strokeWidth || 3}
+                    fill={layer.fillColor || 'none'}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+
               {/* Inline Text Content block */}
-              <div
-                style={{
-                  fontFamily: layer.style.fontFamily,
-                  color: layer.style.color,
-                  fontSize: layer.style.fontSize,
-                  fontWeight: layer.style.fontWeight,
-                  fontStyle: layer.style.fontStyle,
-                  textDecoration: layer.style.textDecoration,
-                  textAlign: layer.style.textAlign,
-                  lineHeight: layer.style.lineHeight,
-                  letterSpacing: layer.style.letterSpacing,
-                  outline: 'none',
-                  backgroundColor: 'transparent',
-                  direction: 'rtl',
-                  unicodeBidi: 'plaintext',
-                }}
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={e => {
-                  onUpdateLayer(layer.id, { text: e.target.innerText });
-                }}
-                className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden text-layer-inner" // 👈 🆕 تم إضافة كلاس text-layer-inner هنا
-              >
-                {layer.text}
-              </div>
+              {(!layer.type || layer.type === 'text') && (
+                <div
+                  style={{
+                    fontFamily: layer.style.fontFamily,
+                    color: layer.style.color,
+                    fontSize: layer.style.fontSize,
+                    fontWeight: layer.style.fontWeight,
+                    fontStyle: layer.style.fontStyle,
+                    textDecoration: layer.style.textDecoration,
+                    textAlign: layer.style.textAlign,
+                    lineHeight: layer.style.lineHeight,
+                    letterSpacing: layer.style.letterSpacing,
+                    outline: 'none',
+                    backgroundColor: 'transparent',
+                    direction: 'rtl',
+                    unicodeBidi: 'plaintext',
+                  }}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={e => {
+                    onUpdateLayer(layer.id, { text: e.target.innerText });
+                  }}
+                  className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden text-layer-inner"
+                >
+                  {layer.text}
+                </div>
+              )}
 
               {/* Special Controls and Handles (Shown when active) */}
               {isActive && (
