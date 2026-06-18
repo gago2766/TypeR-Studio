@@ -1338,18 +1338,60 @@ export default function App() {
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
         bubbleMargin,
-        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
+        activeLayer.lineCountOverride
       );
+
+      // 🆕 تقييد الحجم الذكي بالقيم اليدوية أو وضع السقف التوازني لحماية الهوامش ومنع قفز الحجم لـ 80px
+      let finalFontSize = opt.fontSize;
+      let finalTxt = opt.textWithBreaks;
+
+      if (fontSize !== 'auto') {
+        const userCap = parseFloat(fontSize);
+        if (!isNaN(userCap) && finalFontSize > userCap) {
+          finalFontSize = userCap;
+          const wrapRes = wrapTextToShape(
+            activeLayer.text.replace(/\n/g, ' '),
+            bType,
+            layerWidth,
+            layerHeight,
+            userCap,
+            activeLayer.style.fontFamily,
+            activeLayer.style.lineHeight,
+            parseFloat(activeLayer.style.letterSpacing) || 0,
+            bubbleMargin,
+            activeLayer.lineCountOverride
+          );
+          finalTxt = wrapRes.lines.join('\n');
+        }
+      } else {
+        const maxAutoCap = bType === 'spiky_shout' ? 42 : 25;
+        if (finalFontSize > maxAutoCap) {
+          finalFontSize = maxAutoCap;
+          const wrapRes = wrapTextToShape(
+            activeLayer.text.replace(/\n/g, ' '),
+            bType,
+            layerWidth,
+            layerHeight,
+            maxAutoCap,
+            activeLayer.style.fontFamily,
+            activeLayer.style.lineHeight,
+            parseFloat(activeLayer.style.letterSpacing) || 0,
+            bubbleMargin,
+            activeLayer.lineCountOverride
+          );
+          finalTxt = wrapRes.lines.join('\n');
+        }
+      }
 
       handleUpdateLayer(activeLayer.id, {
         left: `${layerLeft}px`,
         top: `${layerTop}px`,
         width: `${layerWidth}px`,
         height: `${layerHeight}px`,
-        text: opt.textWithBreaks,
+        text: finalTxt,
         style: {
           ...activeLayer.style,
-          fontSize: autoFitText ? `${opt.fontSize}px` : activeLayer.style.fontSize,
+          fontSize: autoFitText ? `${finalFontSize}px` : activeLayer.style.fontSize,
         },
       });
 
@@ -1534,6 +1576,7 @@ export default function App() {
       bgColor: bgTransparent ? 'transparent' : bgColor,
     };
 
+    let finalFontSize = 16;
     if (hasWand && bType) {
       const opt = calculateOptimalFontSizeForShape(
         rawTxt,
@@ -1546,8 +1589,48 @@ export default function App() {
         bubbleMargin,
         activeLayer?.lineCountOverride
       );
-      layStyle.fontSize = `${opt.fontSize}px`;
+      finalFontSize = opt.fontSize;
       txt = opt.textWithBreaks;
+
+      // 🆕 تطبيق القيود الذكية لمنع تضخم الحجم إلى 80px وتحقيق الهامش المثالي
+      if (fontSize !== 'auto') {
+        const userCap = parseFloat(fontSize);
+        if (!isNaN(userCap) && finalFontSize > userCap) {
+          finalFontSize = userCap;
+          const wrapRes = wrapTextToShape(
+            rawTxt,
+            bType,
+            layerWidth,
+            layerHeight,
+            userCap,
+            fontFamily,
+            lineHeight,
+            tracking,
+            bubbleMargin,
+            activeLayer?.lineCountOverride
+          );
+          txt = wrapRes.lines.join('\n');
+        }
+      } else {
+        const maxAutoCap = bType === 'spiky_shout' ? 42 : 25;
+        if (finalFontSize > maxAutoCap) {
+          finalFontSize = maxAutoCap;
+          const wrapRes = wrapTextToShape(
+            rawTxt,
+            bType,
+            layerWidth,
+            layerHeight,
+            maxAutoCap,
+            fontFamily,
+            lineHeight,
+            tracking,
+            bubbleMargin,
+            activeLayer?.lineCountOverride
+          );
+          txt = wrapRes.lines.join('\n');
+        }
+      }
+      layStyle.fontSize = `${finalFontSize}px`;
     } else if (!layStyle.fontSize) {
       const optSize = calculateOptimalFontSize(txt, layerWidth, layerHeight, fontFamily, lineHeight, tracking);
       layStyle.fontSize = `${optSize}px`;
@@ -1672,10 +1755,49 @@ export default function App() {
         activeLayer.style.lineHeight,
         parseFloat(activeLayer.style.letterSpacing) || 0,
         bubbleMargin,
-        activeLayer.lineCountOverride // 👈 تمرير خيار عدد الأسطر الحالي للطبقة
+        activeLayer.lineCountOverride
       );
       optSize = opt.fontSize;
       newText = opt.textWithBreaks;
+
+      // 🆕 تطبيق القيود الذكية لحسابات الحجم في المحاذاة اليدوية
+      if (fontSize !== 'auto') {
+        const userCap = parseFloat(fontSize);
+        if (!isNaN(userCap) && optSize > userCap) {
+          optSize = userCap;
+          const wrapRes = wrapTextToShape(
+            activeLayer.text.replace(/\n/g, ' '),
+            detectedBubbleType,
+            layerWidth,
+            layerHeight,
+            userCap,
+            activeLayer.style.fontFamily,
+            activeLayer.style.lineHeight,
+            parseFloat(activeLayer.style.letterSpacing) || 0,
+            bubbleMargin,
+            activeLayer.lineCountOverride
+          );
+          newText = wrapRes.lines.join('\n');
+        }
+      } else {
+        const maxAutoCap = detectedBubbleType === 'spiky_shout' ? 42 : 25;
+        if (optSize > maxAutoCap) {
+          optSize = maxAutoCap;
+          const wrapRes = wrapTextToShape(
+            activeLayer.text.replace(/\n/g, ' '),
+            detectedBubbleType,
+            layerWidth,
+            layerHeight,
+            maxAutoCap,
+            activeLayer.style.fontFamily,
+            activeLayer.style.lineHeight,
+            parseFloat(activeLayer.style.letterSpacing) || 0,
+            bubbleMargin,
+            activeLayer.lineCountOverride
+          );
+          newText = wrapRes.lines.join('\n');
+        }
+      }
     } else {
       optSize = calculateOptimalFontSize(
         activeLayer.text,
@@ -2495,8 +2617,46 @@ export default function App() {
           activeTracking,
           bubbleMargin
         );
-        layStyle.fontSize = `${opt.fontSize}px`;
+        let finalFontSize = opt.fontSize;
         activeText = opt.textWithBreaks;
+
+        // 🆕 تطبيق القيود الذكية لصف الفقاعات
+        if (activeFontSize !== 'auto') {
+          const userCap = parseFloat(activeFontSize);
+          if (!isNaN(userCap) && finalFontSize > userCap) {
+            finalFontSize = userCap;
+            const wrapRes = wrapTextToShape(
+              lineText,
+              b.shape,
+              layerWidth,
+              layerHeight,
+              userCap,
+              layStyle.fontFamily,
+              layStyle.lineHeight,
+              activeTracking,
+              bubbleMargin
+            );
+            activeText = wrapRes.lines.join('\n');
+          }
+        } else {
+          const maxAutoCap = b.shape === 'spiky_shout' ? 42 : 25;
+          if (finalFontSize > maxAutoCap) {
+            finalFontSize = maxAutoCap;
+            const wrapRes = wrapTextToShape(
+              lineText,
+              b.shape,
+              layerWidth,
+              layerHeight,
+              maxAutoCap,
+              layStyle.fontFamily,
+              layStyle.lineHeight,
+              activeTracking,
+              bubbleMargin
+            );
+            activeText = wrapRes.lines.join('\n');
+          }
+        }
+        layStyle.fontSize = `${finalFontSize}px`;
       } else if (!layStyle.fontSize) {
         const optVal = calculateOptimalFontSize(lineText, layerWidth, layerHeight, activeFontFamily, activeLineHeight, activeTracking);
         layStyle.fontSize = `${optVal}px`;
@@ -3025,6 +3185,74 @@ export default function App() {
       pushToHistory(previousLayers);
     }
   };
+
+  // 🆕 المزامنة الحركية الثنائية: عندما تتغير اللوحة الجانبية، يتم تطبيق التحديث فوراً على الطبقة النشطة
+  useEffect(() => {
+    if (!activeLayer) return;
+    
+    const optFs = fontSize === 'auto'
+      ? calculateOptimalFontSize(
+          activeLayer.text,
+          parseFloat(activeLayer.width) || 120,
+          parseFloat(activeLayer.height) || 80,
+          fontFamily,
+          lineHeight,
+          tracking
+        )
+      : parseFloat(fontSize);
+
+    // حماية ضد حلقات الاستدعاء اللانهائية
+    if (
+      activeLayer.style.fontFamily === fontFamily &&
+      parseFloat(activeLayer.style.fontSize) === optFs &&
+      activeLayer.style.color === textColor &&
+      activeLayer.style.bgColor === (bgTransparent ? 'transparent' : bgColor) &&
+      activeLayer.style.lineHeight === lineHeight &&
+      (parseFloat(activeLayer.style.letterSpacing) || 0) === tracking &&
+      activeLayer.style.textAlign === textAlign &&
+      (activeLayer.style.fontWeight === 'bold') === bold &&
+      (activeLayer.style.fontStyle === 'italic') === italic &&
+      (activeLayer.style.textDecoration === 'underline') === underline
+    ) {
+      return;
+    }
+
+    const previousLayers = [...currentLayers];
+    handleUpdateLayer(activeLayer.id, {
+      style: {
+        fontSize: `${optFs}px`,
+        color: textColor,
+        fontFamily: fontFamily,
+        fontWeight: bold ? 'bold' : 'normal',
+        fontStyle: italic ? 'italic' : 'normal',
+        textDecoration: underline ? 'underline' : 'none',
+        textAlign: textAlign,
+        lineHeight: lineHeight,
+        letterSpacing: `${tracking}px`,
+        bgColor: bgTransparent ? 'transparent' : bgColor,
+      }
+    });
+    pushToHistory(previousLayers);
+  }, [fontFamily, fontSize, textColor, bgColor, bgTransparent, lineHeight, tracking, textAlign, bold, italic, underline]);
+
+  // 🆕 المزامنة العكسية: عند الضغط على أي عنصر نص بمسرح العمل، تنعكس إعداداته فوراً على اللوحة الجانبية
+  useEffect(() => {
+    if (!activeLayer) return;
+    const style = activeLayer.style;
+    
+    const parsedFs = style.fontSize.replace('px', '');
+    setFontSize(parsedFs || 'auto');
+    setTextColor(style.color);
+    setBgColor(style.bgColor === 'transparent' ? '#ffffff' : style.bgColor);
+    setBgTransparent(style.bgColor === 'transparent');
+    setTracking(parseFloat(style.letterSpacing) || 0);
+    setLineHeight(style.lineHeight);
+    setTextAlign(style.textAlign);
+    setFontFamily(style.fontFamily);
+    setBold(style.fontWeight === 'bold');
+    setItalic(style.fontStyle === 'italic');
+    setUnderline(style.textDecoration === 'underline');
+  }, [activeLayer?.id]);
 
   return (
     <div className="w-screen h-screen overflow-x-auto overflow-y-hidden bg-[#121212] antialiased">
