@@ -489,7 +489,7 @@ export default function App() {
 
   const handleSelectLine = (index: number) => {
     if (index < 0 || index >= parsedLines.length) return;
-    setCurrentLineIndex(index);
+    setCurrentPageIndex(index);
     const line = parsedLines[index];
 
     if (line.targetPageNum !== null) {
@@ -2605,8 +2605,10 @@ export default function App() {
     const url = canvas.toDataURL();
     handleUpdateCleaningDataUrl(url);
 
-    setBubbleQueue([]);
-    clearWandSelection();
+    // 🆕 تم إيقاف الحذف التلقائي للتحديد ليبقى فعالاً حتى تضغط يدويًا على زر "مسح"
+    // setBubbleQueue([]); 
+    // clearWandSelection(); 
+
     addToast(`✓ تم تبييض جميع الفقاعات المحددة بلونها الأصلي دفعة واحدة! 🧼🎨`, 'success');
   };
 
