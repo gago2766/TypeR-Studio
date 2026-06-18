@@ -10,8 +10,8 @@ interface SidebarProps {
   onShare: () => void;
 
   // Tool Selection
-  activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand';
-  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand') => void;
+  activeTool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand' | 'pen'; // 🆕 إضافة 'pen'
+  setActiveTool: (tool: 'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand' | 'pen') => void;
   wandTolerance: number;
 
   // Cleaning & redrawing props
@@ -105,6 +105,9 @@ interface SidebarProps {
   // Folder and Style modifications
   onDeleteFolder?: (folderId: string) => void;
   onEditStyle?: (style: TextStyle, folderId: string) => void;
+
+  // 🆕 دالة لإضافة صورة تراكب (Image Overlay)
+  onAddImageOverlay?: (base64Src: string, filename: string) => void;
 }
 
 export function Sidebar({
@@ -188,6 +191,7 @@ export function Sidebar({
   onSelectBubbleShape,
   onDeleteFolder,
   onEditStyle,
+  onAddImageOverlay, // 🆕
 }: SidebarProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -260,6 +264,29 @@ export function Sidebar({
           </button>
         </div>
 
+        {/* 🆕 صف إضافة صورة تراكب (Image Overlay Layer) */}
+        <div className="grid grid-cols-1">
+          <label className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold py-2 px-1 rounded cursor-pointer transition text-center select-none truncate flex items-center justify-center gap-1">
+            <span>🖼️ إضافة صورة تراكب (Overlay)</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && onAddImageOverlay) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    onAddImageOverlay(ev.target?.result as string, file.name);
+                  };
+                  reader.readAsDataURL(file);
+                }
+                e.target.value = ''; // تصفير القيمة لإعادة التفعيل للرفع المتكرر
+              }}
+              className="hidden"
+            />
+          </label>
+        </div>
+
         <div className="grid grid-cols-2 gap-1 compact-hide">
           <button
             onClick={onSaveState}
@@ -290,25 +317,37 @@ export function Sidebar({
           <div className="flex gap-1.5 mb-1.5">
             <button
               onClick={() => setActiveTool('marquee')}
-              className={`flex-1 text-[11px] py-1.5 px-2 rounded font-medium transition ${
+              className={`flex-1 text-[10px] py-1.5 px-1 rounded font-medium transition ${
                 activeTool === 'marquee'
-                  ? 'bg-[#007acc] text-white'
+                  ? 'bg-[#007acc] text-white font-bold'
                   : 'bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d]'
               }`}
               id="tool-marquee-btn"
             >
-              التحديد المستطيل 🔲
+              تحديد مستطيل 🔲
             </button>
             <button
               onClick={() => setActiveTool('magic_wand')}
-              className={`flex-1 text-[11px] py-1.5 px-2 rounded font-medium transition ${
+              className={`flex-1 text-[10px] py-1.5 px-1 rounded font-medium transition ${
                 activeTool === 'magic_wand'
-                  ? 'bg-[#007acc] text-white'
+                  ? 'bg-[#007acc] text-white font-bold'
                   : 'bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d]'
               }`}
               id="tool-magic-btn"
             >
-              العصا السحرية 🪄
+              عصا سحرية 🪄
+            </button>
+            {/* 🆕 زر تفعيل أداة القلم التفاعلية باللوحة الجانبية */}
+            <button
+              onClick={() => setActiveTool('pen')}
+              className={`flex-1 text-[10px] py-1.5 px-1 rounded font-medium transition ${
+                activeTool === 'pen'
+                  ? 'bg-[#007acc] text-white font-bold'
+                  : 'bg-[#2d2d2d] border border-[#3c3c3c] text-gray-300 hover:bg-[#3d3d3d]'
+              }`}
+              id="tool-pen-btn"
+            >
+              رسم القلم ✒️
             </button>
           </div>
           <div className="text-[10px] text-gray-400 bg-[#0a0a0a] border-l-2 border-l-[#007acc] p-2 leading-relaxed rounded">
@@ -316,6 +355,8 @@ export function Sidebar({
               ? `🪄 العصا السحرية: اضغط داخل البياض لتحديد حواف الفقاعة تلقائياً (الحساسية: ${wandTolerance})`
               : activeTool === 'marquee'
               ? '🔲 اسحب للتحديد: ارسم مستطيل سحب يدوياً لتحديد موضع النص والأبعاد.'
+              : activeTool === 'pen'
+              ? '✒️ أداة القلم: اضغط على الصفحة لإضافة نقاط تثبيت ورسم مسارات أو أشكال مخصصة مغلقة.'
               : activeTool === 'zoom'
               ? '🔍 عدسة الزووم: اضغط لتكبير الصفحة، أو اضغط مع Alt للتصغير.'
               : activeTool === 'hand'
