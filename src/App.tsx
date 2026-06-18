@@ -489,7 +489,7 @@ export default function App() {
 
   const handleSelectLine = (index: number) => {
     if (index < 0 || index >= parsedLines.length) return;
-    setCurrentPageIndex(index);
+    setCurrentLineIndex(index); // 👈 🆕 تم التعديل واستبدال setCurrentPageIndex بـ setCurrentLineIndex لحل انهيار الشاشة البيضاء
     const line = parsedLines[index];
 
     if (line.targetPageNum !== null) {
