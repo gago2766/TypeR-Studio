@@ -436,9 +436,9 @@ export function Workspace({
           const clickY = (touch.clientY - rect.top) / zoom;
 
           const left = Math.min(startPos.x, clickX);
-          const top = Math.min(startPos.y, clickY); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
+          const top = Math.min(startPos.y, clickY); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY الموثقة للماوس والتاتش
           const width = Math.abs(clickX - startPos.x);
-          const height = Math.abs(clickY - startPos.y); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY
+          const height = Math.abs(clickY - startPos.y); // 👈 🆕 تم التعديل واستبدال currentY بـ clickY الموثقة للماوس والتاتش
 
           setSelectionBox({
             left,
@@ -1435,9 +1435,9 @@ export function Workspace({
                   outlineOffset: '1px'
                 } : {})
               }}
-              className={`absolute cursor-move flex items-center justify-center text-center p-1 border border-transparent z-10 box-border hover:border-gray-400/60 ${
+              className={`absolute cursor-move flex items-center justify-center text-center p-1 border border-transparent z-10 box-border hover:border-gray-400/60 text-layer ${
                 isActive ? 'z-30' : ''
-              }`}
+              }`} // 👈 🆕 تمت إعادة إضافة كلاس text-layer لدعم الحفظ التلقائي ومزامنة الخطوط الفورية
             >
               {/* Inline Text Content block */}
               <div
@@ -1461,7 +1461,7 @@ export function Workspace({
                 onBlur={e => {
                   onUpdateLayer(layer.id, { text: e.target.innerText });
                 }}
-                className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden"
+                className="w-full h-full flex flex-col justify-center select-text whitespace-pre-wrap select-none overflow-hidden text-layer-inner" // 👈 🆕 تم إضافة كلاس text-layer-inner هنا
               >
                 {layer.text}
               </div>
