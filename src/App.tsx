@@ -113,7 +113,7 @@ export default function App() {
   const [currentLineIndex, setCurrentLineIndex] = useState<number>(-1);
 
   // الأدوات النشطة وإعدادات الفرشاة
-  const [activeTool, setActiveTool] = useState<'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand'>('marquee');
+  const [activeTool, setActiveTool] = useState<'marquee' | 'magic_wand' | 'brush' | 'eraser' | 'clone_stamp' | 'color_picker' | 'zoom' | 'hand' | 'pen'>('marquee');
   const [brushColor, setBrushColor] = useState<string>('#ffffff');
   const [brushSize, setBrushSize] = useState<number>(15);
   const [stampSource, setStampSource] = useState<{ x: number; y: number } | null>(null);
@@ -259,7 +259,7 @@ export default function App() {
     seedColor?: string; // تبييض الفقاعات بلونها الأصلي
     imgW?: number;   // 🆕
     imgH?: number;   // 🆕
-    edgeSegments?: Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>; // 🆕 حفظ مسارات الحواف للتلوين الجماعي الدائم
+    edgeSegments?: Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>; // 🆕 حفظ مسارات الحواف للتظليل الجماعي الدائم
   }>>([]);
 
   // إعدادات العلامة المائية
@@ -793,16 +793,37 @@ export default function App() {
     );
   };
 
-  // 🧼 دمج مسارات الطبقات مع صورة الخلفية نهائياً
-  const handleMergeLayers = () => {
+  // 🆕 دالة لاستباق تحميل الصور الملحقة لطبقات الـ (Image Overlay) لدمجها بشكل متزامن دون وميض
+  const preloadImageLayers = async (layers: MangaLayer[]): Promise<Map<string, HTMLImageElement>> => {
+    const cache = new Map<string, HTMLImageElement>();
+    const imgLayers = layers.filter(l => l.type === 'image' && l.imageSrc);
+    
+    const promises = imgLayers.map(l => {
+      return new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          cache.set(l.id, img);
+          resolve();
+        };
+        img.onerror = () => resolve(); // تخطي أخطاء الصور التالفة لمواصلة العمل بمرونة
+        img.src = l.imageSrc!;
+      });
+    });
+    
+    await Promise.all(promises);
+    return cache;
+  };
+
+  // 🧼 دمج مسارات الطبقات مع صورة الخلفية نهائياً (محدث لدعم تبييض المنحنيات والقلم والصور المدمجة)
+  const handleMergeLayers = async () => {
     if (currentPageIndex === -1 || !pages[currentPageIndex]) return;
     const page = pages[currentPageIndex];
     if (page.layers.length === 0) {
-      addToast('⚠️ لا توجد طبقات نصوص لدمجها حالياً في هذه الصفحة', 'error');
+      addToast('⚠️ لا توجد طبقات نصوص أو رسومات لدمجها حالياً', 'error');
       return;
     }
 
-    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص مع صورة الخلفية نهائياً (يمكنك التراجع عن هذه خطوة لاحقاً ↩).');
+    const confirmMerge = window.confirm('هل أنت متأكد من دمج جميع الطبقات؟ سيتم دمج النصوص والصور المرفوعة ورسومات القلم مع صورة الخلفية نهائياً.');
     if (!confirmMerge) return;
 
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
@@ -811,58 +832,65 @@ export default function App() {
       return;
     }
 
+    addToast('🔄 جاري تحميل الصور الملحقة لدمج الطبقات...', 'success');
     pushSnapshot(currentLayers, page.cleaningDataUrl || '');
 
-    const renderImg = new Image();
-    renderImg.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = renderImg.naturalWidth;
-      canvas.height = renderImg.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    try {
+      const imageCache = await preloadImageLayers(page.layers);
+      const renderImg = new Image();
+      renderImg.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = renderImg.naturalWidth;
+        canvas.height = renderImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-      ctx.drawImage(renderImg, 0, 0);
+        ctx.drawImage(renderImg, 0, 0);
 
-      const scaleX = renderImg.naturalWidth / imgEl.offsetWidth;
-      const scaleY = renderImg.naturalHeight / imgEl.offsetHeight;
+        const scaleX = renderImg.naturalWidth / imgEl.offsetWidth;
+        const scaleY = renderImg.naturalHeight / imgEl.offsetHeight;
 
-      const applyMerge = () => {
-        page.layers.forEach(l => {
-          if (!l.hidden) {
-            renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY);
-          }
-        });
+        const applyMerge = () => {
+          page.layers.forEach(l => {
+            if (!l.hidden) {
+              renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY, imageCache);
+            }
+          });
 
-        const mergedUrl = canvas.toDataURL('image/png');
+          const mergedUrl = canvas.toDataURL('image/png');
 
-        setPages(prev =>
-          prev.map((p, idx) => {
-            if (idx !== currentPageIndex) return p;
-            return {
-              ...p,
-              layers: [],
-              cleaningDataUrl: mergedUrl
-            };
-          })
-        );
+          setPages(prev =>
+            prev.map((p, idx) => {
+              if (idx !== currentPageIndex) return p;
+              return {
+                ...p,
+                layers: [],
+                cleaningDataUrl: mergedUrl
+              };
+            })
+          );
 
-        setActiveLayer(null);
-        addToast('✓ تم دمج جميع الطبقات وتسطيحها مع الخلفية بنجاح! 📥🎨', 'success');
-      };
-
-      const cleaningUrl = page.cleaningDataUrl;
-      if (cleaningUrl) {
-        const cleaningImg = new Image();
-        cleaningImg.onload = () => {
-          ctx.drawImage(cleaningImg, 0, 0);
-          applyMerge();
+          setActiveLayer(null);
+          addToast('✓ تم دمج وتسطيح جميع الطبقات مع الخلفية بنجاح! 📥🎨', 'success');
         };
+
+        const cleaningUrl = page.cleaningDataUrl;
+        if (cleaningUrl) {
+          const cleaningImg = new Image();
+          cleaningImg.onload = () => {
+            ctx.drawImage(cleaningImg, 0, 0);
+            applyMerge();
+          };
           cleaningImg.src = cleaningUrl;
-      } else {
-        applyMerge();
-      }
-    };
-    renderImg.src = page.src;
+        } else {
+          applyMerge();
+        }
+      };
+      renderImg.src = page.src;
+    } catch (err) {
+      console.error(err);
+      addToast('❌ فشل تحميل بعض الصور الملحقة أثناء عملية الدمج والتسوية', 'error');
+    }
   };
 
   // تبييض المساحة النشطة المحددة بضربة العصا السحرية؛ تم تعديلها لتلوين الفقاعة بلونها المكتشف تلقائياً
@@ -2172,26 +2200,73 @@ export default function App() {
     addToast('تم تطبيق كامل إعدادات النمط بنجاح', 'success');
   };
 
-  // محاكاة تمثيل طبقات النصوص على كائن Canvas مباشر للتصدير - تم تحديثه لاحترام فواصل الأسطر \n
+  // محاكاة تمثيل طبقات النصوص على كائن Canvas مباشر للتصدير - تم تحديثه لاحترام فواصل الأسطر \n (محدث لرسم أشكال القلم والصور المتراكبة بدقة عالية)
   const renderLayerToCanvasBuffer = (
     ctx: CanvasRenderingContext2D,
     layer: MangaLayer,
     scaleX: number,
-    scaleY: number
+    scaleY: number,
+    imageCache?: Map<string, HTMLImageElement> // 🆕 كاش الصور المرفوعة مسبقاً للرسم المتزامن
   ) => {
     const left = parseFloat(layer.left) * scaleX;
     const top = parseFloat(layer.top) * scaleY;
     const width = parseFloat(layer.width) * scaleX;
     const height = parseFloat(layer.height) * scaleY;
+
+    ctx.save();
+
+    // تطبيق التحويلات والدوران على الكانفاس المشترك
+    ctx.translate(left + width / 2, top + height / 2);
+    ctx.rotate(((layer.angle || 0) * Math.PI) / 180);
+    if (layer.flippedY) ctx.scale(1, -1);
+
+    // 🆕 1. رسم طبقة الصورة المركبة (Image Overlay)
+    if (layer.type === 'image' && layer.imageSrc) {
+      const img = imageCache?.get(layer.id);
+      if (img) {
+        ctx.drawImage(img, -width / 2, -height / 2, width, height);
+      }
+      ctx.restore();
+      return;
+    }
+
+    // 🆕 2. رسم طبقة الـ Pen Tool المتجهية بدقة تامة
+    if (layer.type === 'path' && layer.pathPoints) {
+      ctx.beginPath();
+      const pts = layer.pathPoints;
+      if (pts.length > 0) {
+        // تحويل النقطة الأولى وإزاحتها لتكون بمركز الطبقة
+        const startX = (pts[0].x - parseFloat(layer.width) / 2) * scaleX;
+        const startY = (pts[0].y - parseFloat(layer.height) / 2) * scaleY;
+        ctx.moveTo(startX, startY);
+
+        for (let i = 1; i < pts.length; i++) {
+          const currX = (pts[i].x - parseFloat(layer.width) / 2) * scaleX;
+          const currY = (pts[i].y - parseFloat(layer.height) / 2) * scaleY;
+          ctx.lineTo(currX, currY);
+        }
+
+        if (layer.fillColor && layer.fillColor !== 'none') {
+          ctx.fillStyle = layer.fillColor;
+          ctx.fill();
+        }
+        ctx.strokeStyle = layer.strokeColor || '#000000';
+        ctx.lineWidth = (layer.strokeWidth || 3) * scaleY;
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    // 3. رسم طبقة النصوص التقليدية (مع إلغاء إزاحة الدوران لأننا طبقناها بالأعلى)
     const style = layer.style;
     const fs = (parseFloat(style.fontSize) || 16) * scaleY;
     const col = style.color || '#000000';
     const bgCol = style.bgColor || 'transparent';
 
-    ctx.save();
     if (bgCol !== 'transparent' && bgCol !== 'rgba(0,0,0,0)' && bgCol !== 'rgba(0, 0, 0, 0)') {
       ctx.fillStyle = bgCol;
-      ctx.fillRect(left, top, width, height);
+      ctx.fillRect(-width / 2, -height / 2, width, height);
     }
 
     ctx.fillStyle = col;
@@ -2229,10 +2304,10 @@ export default function App() {
 
     const lineH = fs * (style.lineHeight || 1.25);
     const totalH = lines.length * lineH;
-    const startY = top + (height - totalH) / 2 + lineH / 2;
-    const xPos = style.textAlign === 'right' ? left + width - 4
-               : style.textAlign === 'left'  ? left + 4
-               : left + width / 2;
+    const startY = -totalH / 2 + lineH / 2;
+    const xPos = style.textAlign === 'right' ? width / 2 - 4
+               : style.textAlign === 'left'  ? -width / 2 + 4
+               : 0;
 
     lines.forEach((lineVal, idx) => {
       if (style.textDecoration === 'underline') {
@@ -2351,147 +2426,161 @@ export default function App() {
   };
 
   // تصدير الصفحة النشطة إلى صورة PNG
-  const handleExportPNG = () => {
+  const handleExportPNG = async () => {
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
     if (!imgEl || !imgEl.naturalWidth || pages.length === 0) {
       addToast('لا تتوفر صفحة مانجا نشطة لتصديرها', 'error');
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = imgEl.naturalWidth;
-    canvas.height = imgEl.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    addToast('🔄 جاري تحضير الصفحة للتصدير...', 'success');
 
-    ctx.drawImage(imgEl, 0, 0);
+    try {
+      const imageCache = await preloadImageLayers(currentLayers);
+      const canvas = document.createElement('canvas');
+      canvas.width = imgEl.naturalWidth;
+      canvas.height = imgEl.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const cleaningCanvas = cleaningCanvasRef.current;
-    if (cleaningCanvas) {
-      ctx.drawImage(cleaningCanvas, 0, 0);
+      ctx.drawImage(imgEl, 0, 0);
+
+      const cleaningCanvas = cleaningCanvasRef.current;
+      if (cleaningCanvas) {
+        ctx.drawImage(cleaningCanvas, 0, 0);
+      }
+
+      const scaleX = imgEl.naturalWidth / imgEl.offsetWidth;
+      const scaleY = imgEl.naturalHeight / imgEl.offsetHeight;
+
+      currentLayers.forEach(l => {
+        if (!l.hidden) {
+          renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY, imageCache);
+        }
+      });
+
+      drawWatermarkToCanvas(ctx, canvas.width, canvas.height, () => {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          const blob = dataURLtoBlob(dataUrl);
+          triggerDownload(blob, `typer-translated-${pages[currentPageIndex]?.name || 'page'}.png`);
+        } catch (e) {
+          console.error(e);
+          addToast('حدث خطأ أثناء معالجة الصورة وتصديرها', 'error');
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      addToast('❌ فشل تصدير الصورة لوجود خطأ في تحميل الطبقات', 'error');
     }
-
-    const scaleX = imgEl.naturalWidth / imgEl.offsetWidth;
-    const scaleY = imgEl.naturalHeight / imgEl.offsetHeight;
-
-    currentLayers.forEach(l => {
-      if (!l.hidden) {
-        renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY);
-      }
-    });
-
-    drawWatermarkToCanvas(ctx, canvas.width, canvas.height, () => {
-      try {
-        const dataUrl = canvas.toDataURL('image/png');
-        const blob = dataURLtoBlob(dataUrl);
-        triggerDownload(blob, `typer-translated-${pages[currentPageIndex]?.name || 'page'}.png`);
-      } catch (e) {
-        console.error(e);
-        addToast('حدث خطأ أثناء معالجة الصورة وتصديرها', 'error');
-      }
-    });
   };
 
   // 📤 مشاركة الصفحة الحالية المترجمة مباشرة مع التطبيقات الأخرى
-  const handleShare = () => {
+  const handleShare = async () => {
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
     if (!imgEl || !imgEl.naturalWidth || pages.length === 0) {
       addToast('⚠️ لا تتوفر صفحة مانجا نشطة لمشاركتها', 'error');
       return;
     }
 
-    addToast('🔄 جاري تحضير الصفحة للمشاركة...', 'success');
+    addToast('🔄 جاري تحضير وتسطيح الصفحة للمشاركة...', 'success');
 
-    const canvas = document.createElement('canvas');
-    canvas.width = imgEl.naturalWidth;
-    canvas.height = imgEl.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const imageCache = await preloadImageLayers(currentLayers);
+      const canvas = document.createElement('canvas');
+      canvas.width = imgEl.naturalWidth;
+      canvas.height = imgEl.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    ctx.drawImage(imgEl, 0, 0);
+      ctx.drawImage(imgEl, 0, 0);
 
-    const cleaningCanvas = cleaningCanvasRef.current;
-    if (cleaningCanvas) {
-      ctx.drawImage(cleaningCanvas, 0, 0);
-    }
-
-    const scaleX = imgEl.naturalWidth / imgEl.offsetWidth;
-    const scaleY = imgEl.naturalHeight / imgEl.offsetHeight;
-
-    currentLayers.forEach(l => {
-      if (!l.hidden) {
-        renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY);
+      const cleaningCanvas = cleaningCanvasRef.current;
+      if (cleaningCanvas) {
+        ctx.drawImage(cleaningCanvas, 0, 0);
       }
-    });
 
-    drawWatermarkToCanvas(ctx, canvas.width, canvas.height, async () => {
-      try {
-        const dataUrl = canvas.toDataURL('image/png');
-        const filename = `typer-translated-${pages[currentPageIndex]?.name || 'page'}.png`;
+      const scaleX = imgEl.naturalWidth / imgEl.offsetWidth;
+      const scaleY = imgEl.naturalHeight / imgEl.offsetHeight;
 
-        // 📱 تفعيل المشاركة الأصلية في حال كان التطبيق يعمل كـ APK على الهاتف
-        if (Capacitor && Capacitor.isNativePlatform()) {
-          try {
-            if (!Filesystem || !Share || !Directory) {
-              addToast('⚠️ جاري معالجة تفعيل حزم المشاركة، يرجى المحاولة بعد قليل...', 'error');
-              return;
+      currentLayers.forEach(l => {
+        if (!l.hidden) {
+          renderLayerToCanvasBuffer(ctx, l, scaleX, scaleY, imageCache);
+        }
+      });
+
+      drawWatermarkToCanvas(ctx, canvas.width, canvas.height, async () => {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          const filename = `typer-translated-${pages[currentPageIndex]?.name || 'page'}.png`;
+
+          // 📱 تفعيل المشاركة الأصلية في حال كان التطبيق يعمل كـ APK على الهاتف
+          if (Capacitor && Capacitor.isNativePlatform()) {
+            try {
+              if (!Filesystem || !Share || !Directory) {
+                addToast('⚠️ جاري معالجة تفعيل حزم المشاركة، يرجى المحاولة بعد قليل...', 'error');
+                return;
+              }
+              const base64Raw = dataUrl.split(',')[1] || dataUrl;
+              
+              // كتابة الملف مؤقتاً في كاش الهاتف لتتمكن قائمة أندرويد من قراءته
+              await Filesystem.writeFile({
+                path: filename,
+                data: base64Raw,
+                directory: Directory.Cache,
+              });
+
+              const fileUriResult = await Filesystem.getUri({
+                directory: Directory.Cache,
+                path: filename,
+              });
+
+              // استدعاء شاشة المشاركة الأصلية للنظام لأي تطبيق آخر
+              await Share.share({
+                title: 'TypeR Studio - مشاركة ترجمة المانجا',
+                files: [fileUriResult.uri],
+              });
+
+              // تنظيف الملف المؤقت فور إتمام العملية
+              await Filesystem.deleteFile({
+                directory: Directory.Cache,
+                path: filename,
+              });
+
+              addToast('✓ تم استدعاء قائمة المشاركة الأصلية بنجاح 📤', 'success');
+            } catch (nativeErr) {
+              console.error('Native sharing error:', nativeErr);
+              addToast('❌ فشل استدعاء المشاركة الأصلية للنظام', 'error');
             }
-            const base64Raw = dataUrl.split(',')[1] || dataUrl;
-            
-            // كتابة الملف مؤقتاً في كاش الهاتف لتتمكن قائمة أندرويد من قراءته
-            await Filesystem.writeFile({
-              path: filename,
-              data: base64Raw,
-              directory: Directory.Cache,
-            });
-
-            const fileUriResult = await Filesystem.getUri({
-              directory: Directory.Cache,
-              path: filename,
-            });
-
-            // استدعاء شاشة المشاركة الأصلية للنظام لأي تطبيق آخر
-            await Share.share({
-              title: 'TypeR Studio - مشاركة ترجمة المانجا',
-              files: [fileUriResult.uri],
-            });
-
-            // تنظيف الملف المؤقت فور إتمام العملية
-            await Filesystem.deleteFile({
-              directory: Directory.Cache,
-              path: filename,
-            });
-
-            addToast('✓ تم استدعاء قائمة المشاركة الأصلية بنجاح 📤', 'success');
-          } catch (nativeErr) {
-            console.error('Native sharing error:', nativeErr);
-            addToast('❌ فشل استدعاء المشاركة الأصلية للنظام', 'error');
+            return;
           }
-          return;
-        }
 
-        // 🌐 العمل في وضع المتصفح العادي (Web Browser)
-        const blob = dataURLtoBlob(dataUrl);
-        const file = new File([blob], filename, { type: 'image/png' });
+          // 🌐 العمل في وضع المتصفح العادي (Web Browser)
+          const blob = dataURLtoBlob(dataUrl);
+          const file = new File([blob], filename, { type: 'image/png' });
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'TypeR Studio - مشاركة ترجمة المانجا',
-            text: 'لقد قمت بترجمة صفحة مانجا باستخدام تطبيق تايبر ستوديو! 🚀🎨',
-          });
-          addToast('✓ تم فتح نافذة المشاركة لتطبيقاتك بنجاح 📤', 'success');
-        } else {
-          setFallbackFile({ url: dataUrl, blob, filename });
-          addToast('⚠️ ميزة المشاركة المباشرة غير مدعومة في متصفحك. تم فتح نافذة الحفظ الاحتياطية.', 'error');
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'TypeR Studio - مشاركة ترجمة المانجا',
+              text: 'لقد قمت بترجمة صفحة مانجا باستخدام تطبيق تايبر ستوديو! 🚀🎨',
+            });
+            addToast('✓ تم فتح نافذة المشاركة لتطبيقاتك بنجاح 📤', 'success');
+          } else {
+            setFallbackFile({ url: dataUrl, blob, filename });
+            addToast('⚠️ ميزة المشاركة المباشرة غير مدعومة في متصفحك. تم فتح نافذة الحفظ الاحتياطية.', 'error');
+          }
+        } catch (e: any) {
+          console.error(e);
+          if (e.name !== 'AbortError') {
+            addToast('حدث خطأ أثناء محاولة مشاركة الصورة', 'error');
+          }
         }
-      } catch (e: any) {
-        console.error(e);
-        if (e.name !== 'AbortError') {
-          addToast('حدث خطأ أثناء محاولة مشاركة الصورة', 'error');
-        }
-      }
-    });
+      });
+    } catch (err) {
+      console.error(err);
+      addToast('❌ خطأ أثناء معالجة دمج طبقات الصور للمشاركة', 'error');
+    }
   };
 
   // حفظ واستعادة تقدم وحالة المحرر
@@ -3094,7 +3183,7 @@ export default function App() {
             "This is a manga page and a black-and-white mask indicating the areas with text or artifacts to be removed. Please erase the text in the white areas of the mask, and seamlessly reconstruct the background texture, drawings, or speech bubbles underneath. Return only the final edited page as an image output."
           ],
           config: {
-            responseModalalities: ["IMAGE"]
+            responseModalities: ["IMAGE"]
           }
         });
 
@@ -3244,6 +3333,105 @@ export default function App() {
 
       pushToHistory(previousLayers);
     }
+  };
+
+  // 🆕 دالة لإضافة مسار الـ Pen Tool المرسوم كطبقة متجهية ذكية بمسرح العمل
+  const handleAddPenLayer = (points: Array<{ x: number; y: number }>, isClosed: boolean) => {
+    if (currentPageIndex === -1 || !pages[currentPageIndex]) return;
+    const prevLayers = [...currentLayers];
+    
+    // حساب أبعاد الصندوق الافتراضي المحيط بالنقاط لتأطير عنصر الـ SVG بمسرح العمل
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const w = Math.max(20, maxX - minX);
+    const h = Math.max(20, maxY - minY);
+
+    // تحويل إحداثيات النقاط لتكون نسبية داخل صندوق الطبقة لكي تتحرك وتلتف مع الطبقة لاحقاً بمرونة
+    const relativePoints = points.map(p => ({
+      x: p.x - minX,
+      y: p.y - minY,
+    }));
+
+    const newLayer: MangaLayer = {
+      id: `lid_${Date.now()}_path_${Math.floor(Math.random()*1000)}`,
+      type: 'path',
+      text: '',
+      pathPoints: relativePoints,
+      strokeColor: brushColor, // ربطه بالقطارة ولون الفرشاة النشط
+      strokeWidth: 4,
+      fillColor: isClosed ? `${brushColor}33` : 'none', // تعبئة خفيفة للمسار المغلق بنسبة شفافية 20%
+      left: `${minX}px`,
+      top: `${minY}px`,
+      width: `${w}px`,
+      height: `${h}px`,
+      hidden: false,
+      style: {
+        fontSize: '',
+        color: brushColor,
+        fontFamily: 'Tahoma, sans-serif',
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        lineHeight: 1.2,
+        letterSpacing: '0px',
+        bgColor: 'transparent',
+      }
+    };
+
+    setPages(prev =>
+      prev.map((page, idx) => {
+        if (idx !== currentPageIndex) return page;
+        return { ...page, layers: [...page.layers, newLayer] };
+      })
+    );
+    setActiveLayer(newLayer);
+    pushToHistory(prevLayers);
+    addToast('✓ تم إنشاء مسار متجهي من القلم ورسمه بنجاح 🎉', 'success');
+  };
+
+  // 🆕 دالة لإضافة كائن طبقة تراكب صورة فوق صورة (Image Overlay Layer) بمسرح العمل
+  const handleAddImageOverlay = (base64Src: string, filename: string) => {
+    if (currentPageIndex === -1 || !pages[currentPageIndex]) return;
+    const prevLayers = [...currentLayers];
+
+    const newLayer: MangaLayer = {
+      id: `lid_${Date.now()}_img_${Math.floor(Math.random()*1000)}`,
+      type: 'image',
+      text: '',
+      imageSrc: base64Src,
+      left: '50px',
+      top: '50px',
+      width: '180px',
+      height: '180px',
+      hidden: false,
+      style: {
+        fontSize: '',
+        color: '#000000',
+        fontFamily: 'Tahoma, sans-serif',
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        lineHeight: 1.2,
+        letterSpacing: '0px',
+        bgColor: 'transparent',
+      }
+    };
+
+    setPages(prev =>
+      prev.map((page, idx) => {
+        if (idx !== currentPageIndex) return page;
+        return { ...page, layers: [...page.layers, newLayer] };
+      })
+    );
+    setActiveLayer(newLayer);
+    pushToHistory(prevLayers);
+    addToast(`✓ تم إدراج الصورة "${filename}" كطبقة نشطة بنجاح 🖼️`, 'success');
   };
 
   // 🆕 المزامنة الحركية الثنائية: عندما تتغير اللوحة الجانبية، يتم تطبيق التحديث فوراً على الطبقة النشطة
@@ -3902,6 +4090,7 @@ export default function App() {
           onDuplicateLayer={handleDuplicateLayer}
           zoom={zoom} // 👈 تمرير قيمة الزووم لمسرح العمل
           setZoom={setZoom} // 👈 تمرير دالة تعديل الزووم لمسرح العمل
+          onAddPenLayer={handleAddPenLayer} // 🆕 ربط دالة مسارات خطوط القلم المتجهة
         />
 
         {/* لوحة التحكم بالطبقات السفلية والتراجع */}
@@ -4012,6 +4201,7 @@ export default function App() {
         onSelectBubbleShape={handleSelectBubbleShape}
         onDeleteFolder={handleDeleteFolder} // 👈 ربط دالة حذف المجلدات
         onEditStyle={handleOpenEditStyle} // 👈 ربط دالة فتح شاشة التعديل
+        onAddImageOverlay={handleAddImageOverlay} // 🆕 ربط دالة طبقات تراكب الصور
       />
 
       {/* شريط الأدوات العائم فوق النصوص النشطة للتعديل السريع */}
@@ -4270,3 +4460,4 @@ export default function App() {
     </div>
   );
 }
+
