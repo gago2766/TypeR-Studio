@@ -4,6 +4,7 @@ import { calculateOptimalFontSize } from '../utils';
 import { LayerItem } from './workspace/LayerItem';
 import { GuidesOverlay } from './workspace/GuidesOverlay';
 import { PenToolbar } from './workspace/PenToolbar';
+import { WatermarkOverlay } from './workspace/WatermarkOverlay';
 
 interface WorkspaceProps {
   mangaSrc: string;
@@ -1923,45 +1924,16 @@ export const Workspace = React.memo(function Workspace({
           />
         )}
 
-        {watermarkEnabled && (
-          <div
-            style={{
-              opacity: watermarkOpacity,
-              fontSize: `${watermarkSize}px`,
-              transition: 'all 0.2s',
-            }}
-            className={`absolute pointer-events-none select-none z-[12] ${
-              watermarkPosition === 'top-left' ? 'top-4 left-4' :
-              watermarkPosition === 'top-right' ? 'top-4 right-4' :
-              watermarkPosition === 'bottom-left' ? 'bottom-4 left-4' :
-              'bottom-4 right-4'
-            }`}
-          >
-            {watermarkType === 'text' ? (
-              <span 
-                style={{
-                  fontFamily: 'Tahoma, sans-serif',
-                  textShadow: '1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8), 1px -1px 3px rgba(0,0,0,0.8), -1px 1px 3px rgba(0,0,0,0.8)',
-                }}
-                className="text-white font-bold tracking-wide whitespace-nowrap block"
-              >
-                {watermarkText}
-              </span>
-            ) : (
-              watermarkImage && (
-                <img
-                  src={watermarkImage}
-                  style={{
-                    width: `${watermarkSize * 4}px`,
-                    height: 'auto',
-                  }}
-                  className="object-contain block max-w-full drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]"
-                  alt="Watermark logo"
-                />
-              )
-            )}
-          </div>
-        )}
+        {/* 💧 العلامة المائية المخصصة (مستخرجة عبر WatermarkOverlay) */}
+        <WatermarkOverlay
+          enabled={watermarkEnabled}
+          type={watermarkType}
+          text={watermarkText}
+          image={watermarkImage}
+          opacity={watermarkOpacity}
+          position={watermarkPosition}
+          size={watermarkSize}
+        />
 
         {/* 📐 خطوط المحاذاة الذكية (مستخرجة عبر GuidesOverlay) */}
         <GuidesOverlay dragState={dragState} guides={guides} />
