@@ -1,8 +1,0 @@
-{
-  "name": "TypeR Studio V 01.01",
-  "description": "An Arabic translation typesetting tool for manga, featuring automated bubble detection, layer editing, font management, and styling.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
