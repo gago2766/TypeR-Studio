@@ -3,7 +3,6 @@ name: Safe Unzip and Move to Root
 on:
   workflow_dispatch:
 
-# تمنح هذه الأسطر الأداة صلاحية الكتابة والرفع إلى المستودع لحل مشكلة الإذن 403
 permissions:
   contents: write
 
@@ -16,32 +15,45 @@ jobs:
 
       - name: Unzip and move files safely
         run: |
-          # 1. فك ضغط الملف
-          unzip -o TypeR-Studio-main.zip
-          
-          # 2. حذف مجلد الـ workflows المستخرج لتجنب التعارض ومشاكل الصلاحيات
-          if [ -d "TypeR-Studio-main/.github" ]; then
-            echo "تم العثور على مجلد .github مستخرج، يتم حذفه لتجنب التعارض..."
-            rm -rf TypeR-Studio-main/.github
-          fi
-          
-          # 3. نقل بقية الملفات بأمان إلى المجلد الرئيسي
-          if [ -d "TypeR-Studio-main" ]; then
-            echo "نقل الملفات إلى الخارج..."
-            mv TypeR-Studio-main/* . 2>/dev/null || true
-            mv TypeR-Studio-main/.* . 2>/dev/null || true
-            
-            # حذف المجلد المؤقت الفارغ
-            rm -rf TypeR-Studio-main
+          # 1. تفعيل التعامل مع الملفات المخفية وتفادي أخطاء عدم العثور على ملفات
+          shopt -s dotglob nullglob
+
+          # 2. فك ضغط أي ملف zip موجود
+          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "جاري فك ضغط: $ZIP_FILE"
+            unzip -q -o "$ZIP_FILE" -d temp_extracted/
+          else
+            echo "لم يتم العثور على أي ملف zip!"
+            exit 1
           fi
 
-          # 4. حذف ملف الـ zip الأصلي
-          rm -f TypeR-Studio-main.zip
+          # 3. معرفة المجلد الداخلي المستخرج تلقائياً
+          # إذا كان الأرشيف يحتوي على مجلد رئيسي واحد (مثل TypeR-Studio2-main)
+          SUB_DIR=$(find temp_extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
+
+          if [ -n "$SUB_DIR" ]; then
+            echo "تم العثور على المجلد الداخلي: $SUB_DIR"
+            
+            # حذف مجلد .github الداخلي لتجنب تعارض الصلاحيات إن وُجد
+            rm -rf "$SUB_DIR/.github"
+            
+            # نقل كافة الملفات (بما فيها المخفية) إلى الـ root
+            mv "$SUB_DIR"/* .
+          else
+            echo "الملفات مفكوكة بدون مجلد فرعي..."
+            rm -rf temp_extracted/.github
+            mv temp_extracted/* .
+          fi
+
+          # 4. تنظيف المجلدات المؤقتة وملف الـ zip
+          rm -rf temp_extracted
+          rm -f "$ZIP_FILE"
 
       - name: Commit and Push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Extract files safely to root excluding extracted workflows" || echo "No changes to commit"
+          git add -A
+          git commit -m "Extract files safely to root excluding internal workflows" || echo "No changes to commit"
           git push
