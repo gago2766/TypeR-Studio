@@ -3,6 +3,7 @@ import { MangaLayer, TurboTypesetData, QuickPresetType } from '../types';
 import { calculateOptimalFontSize } from '../utils';
 import { LayerItem } from './workspace/LayerItem';
 import { GuidesOverlay } from './workspace/GuidesOverlay';
+import { PenToolbar } from './workspace/PenToolbar';
 
 interface WorkspaceProps {
   mangaSrc: string;
@@ -1901,34 +1902,13 @@ export const Workspace = React.memo(function Workspace({
           </svg>
         )}
 
+        {/* ✒️ شريط أداة القلم العائم (مستخرج عبر PenToolbar) */}
         {activeTool === 'pen' && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1e1e1e]/95 border border-[#3c3c3c] rounded-lg px-3 py-2 flex items-center gap-3 z-50 shadow-2xl select-none">
-            <span className="text-xs font-bold text-white flex items-center gap-1.5">
-              ✒️ أداة القلم النشطة
-            </span>
-            <div className="w-[1px] h-4 bg-gray-700" />
-            <button
-              onClick={() => handleFinalizePenPath(false)}
-              disabled={penPoints.length < 2}
-              className="bg-[#007acc] hover:bg-[#0062a3] text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2.5 py-1 text-[11px] font-bold transition cursor-pointer"
-            >
-              ✓ رسم المسار
-            </button>
-            <button
-              onClick={() => handleFinalizePenPath(true)}
-              disabled={penPoints.length < 3}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2.5 py-1 text-[11px] font-bold transition cursor-pointer"
-            >
-              ☖ مسار مغلق (تعبئة)
-            </button>
-            <button
-              onClick={() => setPenPoints([])}
-              disabled={penPoints.length === 0}
-              className="bg-red-800/80 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded px-2 py-1 text-[11px] font-bold transition cursor-pointer"
-            >
-              ✕ مسح
-            </button>
-          </div>
+          <PenToolbar
+            penPointsCount={penPoints.length}
+            onFinalizePath={handleFinalizePenPath}
+            onClearPoints={() => setPenPoints([])}
+          />
         )}
 
         {stampSource && imageRef.current && (
