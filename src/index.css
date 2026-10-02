@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* 📱 تحسينات تجربة المستخدم الخاصة بالهواتف الذكية والتلوين */
+
+#manga-img {
+  -webkit-user-drag: none; /* يمنع متصفح الهاتف من سحب الصورة كملف عند الرسم بالفرشاة */
+  -webkit-user-select: none; /* يمنع التحديد الأزرق العشوائي للصورة */
+  user-select: none;
+}
+
+/* 🎨 تحسين سلاسة ونعومة الخطوط العربية ومنع شقوق وفراغات التمطيط (الكشيدة) نهائياً */
+[contenteditable], .text-layer, .text-layer-inner {
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "calt" 1, "curs" 1, "clig" 1;
+  font-variant-ligatures: normal;
+  font-kerning: normal;
+  word-break: keep-all;
+}
+
+/* 🛡️ ضمان اتجاه النص وتلاحم الحروف المتصلة */
+.text-layer-inner {
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
