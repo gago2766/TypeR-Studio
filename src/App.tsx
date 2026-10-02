@@ -47,6 +47,9 @@ import { EditStyleModal } from './components/modals/EditStyleModal';
 import { ExportSelectorModal } from './components/modals/ExportSelectorModal';
 import { FallbackShareModal } from './components/modals/FallbackShareModal';
 
+// 🪝 استيراد خطاف إدارة السجل والتراجع المستقل
+import { useHistory } from './hooks/useHistory';
+
 // 📱 تعريف متغيرات Capacitor بشكل ديناميكي لتجنب أخطاء البناء في بيئات الويب وCI/CD
 let Capacitor: any = null;
 let Share: any = null;
@@ -63,12 +66,6 @@ if (typeof window !== 'undefined') {
   import('@capacitor/filesystem')
     .then((m) => { Filesystem = m.Filesystem; Directory = m.Directory; })
     .catch(() => {});
-}
-
-// 💾 واجهة السجل الموحد لجمع الطبقات والرسم معاً في لقطة واحدة للتراجع العام
-export interface HistorySnapshot {
-  layers: MangaLayer[];
-  cleaningDataUrl: string;
 }
 
 // 🌈 قوالب تدريج لوني واستايلات أيقونية غنية مطابقة لبرامج التصميم الاحترافية
@@ -163,6 +160,28 @@ export default function App() {
   useEffect(() => {
     activeLayerRef.current = activeLayer;
   }, [activeLayer]);
+
+  const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: 'error' | 'success' }>>([]);
+
+  const addToast = (msg: string, type?: 'error' | 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 2800);
+  };
+
+  // 🪝 استخدام خطاف إدارة السجل والتراجع الموحد
+  const {
+    history,
+    pushSnapshot,
+    pushToHistory,
+    handleUndo,
+    handleRedo,
+  } = useHistory(pagesRef, currentPageIndexRef, setPages, setActiveLayer, addToast);
+
+  const handleCleaningUndo = () => handleUndo();
+  const handleCleaningRedo = () => handleRedo();
 
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     try {
@@ -367,8 +386,6 @@ export default function App() {
   const matchOffsetRef = useRef<number>(0);
   const rAFRef = useRef<number | null>(null);
 
-  const [history, setHistory] = useState<Record<number, { undo: HistorySnapshot[]; redo: HistorySnapshot[] }>>({});
-
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showExportSelectorModal, setShowExportSelectorModal] = useState<boolean>(false);
   const [checkedStylesForExport, setCheckedStylesForExport] = useState<string[]>([]);
@@ -389,16 +406,6 @@ export default function App() {
   const [editFormTags, setEditFormTags] = useState('');
   const [editFormTagColor, setEditFormTagColor] = useState('#FFF3B0');
   const [wandSeedColor, setWandSeedColor] = useState<string>('#ffffff');
-
-  const [toasts, setToasts] = useState<Array<{ id: number; msg: string; type?: 'error' | 'success' }>>([]);
-
-  const addToast = (msg: string, type?: 'error' | 'success') => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, msg, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 2800);
-  };
 
   const dataURLtoBlob = (dataUrl: string) => {
     const parts = dataUrl.split(',');
@@ -507,34 +514,6 @@ export default function App() {
     setTimeout(() => URL.revokeObjectURL(url), 100);
     addToast('✓ جاري بدء تحميل الملف بنجاح 📥', 'success');
   };
-
-  const pushSnapshot = useCallback((customLayers?: MangaLayer[], customCleaningUrl?: string) => {
-    const idx = currentPageIndexRef.current;
-    if (idx === -1) return;
-    const page = pagesRef.current[idx];
-    if (!page) return;
-
-    const activeLayers = customLayers !== undefined ? customLayers : [...page.layers];
-    const activeCleaningUrl = customCleaningUrl !== undefined ? customCleaningUrl : (page.cleaningDataUrl || '');
-
-    setHistory(prev => {
-      const pageHist = prev[idx] || { undo: [], redo: [] };
-      const newUndo = [...pageHist.undo.slice(-29), { layers: activeLayers, cleaningDataUrl: activeCleaningUrl }];
-      return {
-        ...prev,
-        [idx]: {
-          undo: newUndo,
-          redo: []
-        }
-      };
-    });
-  }, []);
-
-  const pushToHistory = useCallback((newLayersState: MangaLayer[]) => {
-    const idx = currentPageIndexRef.current;
-    const page = pagesRef.current[idx];
-    pushSnapshot(newLayersState, page?.cleaningDataUrl || '');
-  }, [pushSnapshot]);
 
   const handleUpdateLayer = useCallback((layerId: string, updates: Partial<MangaLayer>, saveToHistory = true) => {
     const idx = currentPageIndexRef.current;
@@ -912,99 +891,6 @@ export default function App() {
     setActiveLayer(newLayer);
     addToast('✓ تم تكرار صندوق النص الحالي وتحديده بنجاح 📋', 'success');
   };
-
-  const handleUndo = useCallback(() => {
-    const idx = currentPageIndexRef.current;
-    if (idx === -1) return;
-    const page = pagesRef.current[idx];
-    if (!page) return;
-    
-    const pageHist = history[idx];
-    if (!pageHist || pageHist.undo.length === 0) {
-      addToast('لا توجد خطوات سابقة للتراجع عنها', 'error');
-      return;
-    }
-
-    const currentState: HistorySnapshot = {
-      layers: page.layers,
-      cleaningDataUrl: page.cleaningDataUrl || ''
-    };
-
-    const previousState = pageHist.undo[pageHist.undo.length - 1];
-
-    setPages(prev =>
-      prev.map((p, i) => {
-        if (i !== idx) return p;
-        return {
-          ...p,
-          layers: previousState.layers,
-          cleaningDataUrl: previousState.cleaningDataUrl || undefined
-        };
-      })
-    );
-
-    setHistory(prev => {
-      const ph = prev[idx];
-      return {
-        ...prev,
-        [idx]: {
-          undo: ph.undo.slice(0, -1),
-          redo: [...ph.redo, currentState]
-        }
-      };
-    });
-
-    setActiveLayer(null);
-    addToast('✓ تراجع عن آخر خطوة موحدة ↩', 'success');
-  }, [history]);
-
-  const handleRedo = useCallback(() => {
-    const idx = currentPageIndexRef.current;
-    if (idx === -1) return;
-    const page = pagesRef.current[idx];
-    if (!page) return;
-
-    const pageHist = history[idx];
-    if (!pageHist || pageHist.redo.length === 0) {
-      addToast('لا تتوفر خطوات لإعادة تطبيقها', 'error');
-      return;
-    }
-
-    const currentState: HistorySnapshot = {
-      layers: page.layers,
-      cleaningDataUrl: page.cleaningDataUrl || ''
-    };
-
-    const nextState = pageHist.redo[pageHist.redo.length - 1];
-
-    setPages(prev =>
-      prev.map((p, i) => {
-        if (i !== idx) return p;
-        return {
-          ...p,
-          layers: nextState.layers,
-          cleaningDataUrl: nextState.cleaningDataUrl || undefined
-        };
-      })
-    );
-
-    setHistory(prev => {
-      const ph = prev[idx];
-      return {
-        ...prev,
-        [idx]: {
-          undo: [...ph.undo, currentState],
-          redo: ph.redo.slice(0, -1)
-        }
-      };
-    });
-
-    setActiveLayer(null);
-    addToast('✓ إعادة تطبيق آخر خطوة موحدة ↪', 'success');
-  }, [history]);
-
-  const handleCleaningUndo = () => handleUndo();
-  const handleCleaningRedo = () => handleRedo();
 
   const handleUpdateCleaningDataUrl = useCallback((url: string) => {
     const idx = currentPageIndexRef.current;
@@ -4088,7 +3974,7 @@ export default function App() {
     <div className="w-screen h-screen overflow-x-auto overflow-y-hidden bg-[#121212] antialiased">
       <div className="flex h-full min-w-[1240px] font-sans text-gray-300 relative overflow-hidden">
       
-      {/* 🖼️ نافذة المعاينة والحفظ والمشاركة الاحتياطية (مستخرجة كملف منفصل) */}
+      {/* 🖼️ نافذة المعاينة والحفظ والمشاركة الاحتياطية */}
       <FallbackShareModal
         fallbackFile={fallbackFile}
         onClose={() => setFallbackFile(null)}
@@ -4133,7 +4019,7 @@ export default function App() {
         onSelectFont={handleSelectFontFamily}
       />
 
-      {/* 📤 نافذة تحديد الأنماط لمشاركتها (مستخرجة كملف منفصل) */}
+      {/* 📤 نافذة تحديد الأنماط لمشاركتها */}
       <ExportSelectorModal
         isOpen={showExportSelectorModal}
         onClose={() => setShowExportSelectorModal(false)}
@@ -4144,7 +4030,7 @@ export default function App() {
         addToast={addToast}
       />
 
-      {/* ⚙️ نافذة الإعدادات المتكاملة (مستخرجة كملف منفصل) */}
+      {/* ⚙️ نافذة الإعدادات المتكاملة */}
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
@@ -4556,7 +4442,7 @@ export default function App() {
         onSelectFont={handleSelectFontFamily}
       />
 
-      {/* ⚙️ نافذة تعديل النمط التنسيقي (مستخرجة كملف منفصل) */}
+      {/* ⚙️ نافذة تعديل النمط التنسيقي */}
       <EditStyleModal
         editingStyle={editingStyle}
         onClose={() => setEditingStyle(null)}
