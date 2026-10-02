@@ -1,27 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Upload, 
-  Download, 
-  Trash2, 
-  Sparkles, 
-  Settings, 
-  Undo2, 
-  Redo2, 
-  ChevronRight, 
-  ChevronLeft, 
-  Plus, 
   CheckCircle, 
-  AlertCircle,
-  Eye,
-  EyeOff,
-  Files,
-  Maximize2,
-  FolderPlus,
-  Folder,
-  Sliders,
-  AlignLeft,
-  AlignCenter,
-  AlignRight
+  AlertCircle
 } from 'lucide-react';
 
 import { 
@@ -38,7 +18,6 @@ import {
 } from './types';
 
 import { 
-  rgbToHex, 
   calculateOptimalFontSize, 
   tatweelLine,
   stepTatweel,
@@ -47,12 +26,10 @@ import {
   computeLayerBoundsFromWand,
   whitenMaskArea,
   getFonts,
-  saveFont,
   saveFavoriteFonts,
   getFavoriteFonts,
   stretchSelectedText,
   contentAwareFillLocal,
-  removeTatweel,
   formatFontFamilyForCanvas,
   extractGradientAndStrokeFromSelection
 } from './utils';
@@ -62,10 +39,13 @@ import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { LayersPanel } from './components/LayersPanel';
 import { Workspace } from './components/Workspace';
+import { runLamaInpaint } from './utils/localInpaint';
+
+// 🪟 استيراد النوافذ المنبثقة المستقلة
 import { SettingsModal } from './components/modals/SettingsModal';
 import { EditStyleModal } from './components/modals/EditStyleModal';
 import { ExportSelectorModal } from './components/modals/ExportSelectorModal';
-import { runLamaInpaint } from './utils/localInpaint';
+import { FallbackShareModal } from './components/modals/FallbackShareModal';
 
 // 📱 تعريف متغيرات Capacitor بشكل ديناميكي لتجنب أخطاء البناء في بيئات الويب وCI/CD
 let Capacitor: any = null;
@@ -105,7 +85,6 @@ const DEFAULT_GRADIENT_PRESETS: GradientPreset[] = [
   { id: 'grad_black_white_frame', name: 'أسود بإطار ناصع', colors: ['#111111', '#222222'], angle: 90, type: 'linear', strokeColor: '#ffffff', strokeWidth: 3 },
 ];
 
-// تهيئة البنية والأنماط الأولية بدون فرض أي خط نظام
 const INITIAL_FOLDERS: StyleFolder[] = [
   {
     id: "folder_dialogue",
@@ -157,7 +136,6 @@ export default function App() {
   const cleaningCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [compactMode, setCompactMode] = useState<boolean>(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [activeLayer, setActiveLayer] = useState<MangaLayer | null>(null);
   
   const pagesRef = useRef<MangaPage[]>([]);
@@ -202,11 +180,7 @@ export default function App() {
     }
   });
 
-  useEffect(() => {
-    setIsSidebarOpen(window.innerWidth >= 1024);
-  }, []);
-
-  // 💾 بدء تشغيل قائمة الخطوط المرفوعة فوراً وبشكل نقي
+  // 💾 بدء تشغيل قائمة الخطوط المرفوعة
   const [customFonts, setCustomFonts] = useState<CustomFont[]>(() => {
     try {
       const savedMeta = localStorage.getItem('typer_custom_fonts_meta');
@@ -220,7 +194,6 @@ export default function App() {
     return getFavoriteFonts();
   });
 
-  // تحميل ملفات الخطوط الثنائية المرفوعة من IndexedDB
   useEffect(() => {
     const loadSavedFonts = async () => {
       try {
@@ -230,7 +203,6 @@ export default function App() {
         for (const font of savedFonts) {
           try {
             const fontName = font.name.trim();
-
             const fontFace = new FontFace(fontName, font.data);
             await fontFace.load();
             document.fonts.add(fontFace);
@@ -310,7 +282,6 @@ export default function App() {
     }
   }, [folders]);
 
-  // إعدادات الخط والنمط بدون فرض أي خط نظامي افتراضي
   const [fontFamily, setFontFamily] = useState<string>(() => {
     try {
       const savedMeta = localStorage.getItem('typer_custom_fonts_meta');
@@ -332,11 +303,9 @@ export default function App() {
   const [italic, setItalic] = useState<boolean>(false);
   const [underline, setUnderline] = useState<boolean>(false);
 
-  // 🖌️ حالات الحد الخارجي للخط (Stroke)
   const [strokeColor, setStrokeColor] = useState<string>('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState<number>(0);
 
-  // 🌈 قوالب تدريج الألوان المحفوظة
   const [gradientPresets, setGradientPresets] = useState<GradientPreset[]>(() => {
     try {
       const saved = localStorage.getItem('typer_gradient_presets');
@@ -355,7 +324,6 @@ export default function App() {
   }, [gradientPresets]);
 
   const [activeGradient, setActiveGradient] = useState<TextGradient | null>(null);
-
   const [showFontManager, setShowFontManager] = useState<boolean>(false);
 
   useEffect(() => {
@@ -364,7 +332,6 @@ export default function App() {
 
   const [tatweelStrength, setTatweelStrength] = useState<number>(2);
   const [tatweelMargin, setTatweelMargin] = useState<number>(5);
-
   const [manualTatweelStep, setManualTatweelStep] = useState<number>(1);
   const [selectionBox, setSelectionBox] = useState<{ left: number; top: number; width: number; height: number; visible: boolean } | null>(null);
   const [wandMask, setWandMask] = useState<Uint8Array | null>(null);
@@ -382,8 +349,8 @@ export default function App() {
     shape?: 'normal_oval' | 'spiky_shout' | 'thought_cloud' | 'narrative_box' | 'vertical_oval';
     mask?: Uint8Array;
     seedColor?: string;
-    imgW: number;
-    imgH: number;
+    imgW?: number;
+    imgH?: number;
     edgeSegments?: Array<{ x1: number; y1: number; x2: number; y2: number; horiz: boolean }>;
   }>>([]);
 
@@ -446,7 +413,6 @@ export default function App() {
     return new Blob([u8arr], { type: mime });
   };
 
-  // 📤 مشاركة أي ملف مع التطبيقات
   const handleShareFile = async (content: string, filename: string, title: string) => {
     try {
       if (Capacitor && Capacitor.isNativePlatform() && Filesystem && Share && Directory) {
@@ -644,7 +610,6 @@ export default function App() {
     );
   }, [selectedStyleId]);
 
-  // تحديث مباشر للنمط والطبقة النشطة في الوقت الحقيقي
   const handleUpdateActiveStyle = useCallback((updates: Partial<TextStyle>) => {
     updateActiveStyleInFolders(updates);
     if (activeLayerRef.current) {
@@ -673,13 +638,11 @@ export default function App() {
     }
   }, [handleUpdateLayer, updateActiveStyleInFolders]);
 
-  // تحديث لون الـ Stroke فوراً في الطبقة النشطة
   const handleUpdateStrokeColor = useCallback((newColor: string) => {
     setStrokeColor(newColor);
     handleUpdateActiveStyle({ strokeColor: newColor });
   }, [handleUpdateActiveStyle]);
 
-  // تحديث سمك الـ Stroke فوراً في الطبقة النشطة
   const handleUpdateStrokeWidth = useCallback((newWidth: number) => {
     setStrokeWidth(newWidth);
     handleUpdateActiveStyle({ strokeWidth: newWidth });
@@ -770,7 +733,6 @@ export default function App() {
     setSelectionBox(null);
   }, [customFonts]);
 
-  // تصحيح فحص واستخراج الأسطر والوسوم وحذف النقطتين الرأسيتين مع علامة []:
   useEffect(() => {
     const rawLines = scriptInput.split('\n');
     const parsed: ProcessedLine[] = [];
@@ -1060,7 +1022,6 @@ export default function App() {
     );
   }, [pushSnapshot]);
 
-  // ⚡ معالج النقرة الخارقة الموثوق
   const handleTurboTypeset = useCallback((data: TurboTypesetData) => {
     const idx = currentPageIndexRef.current;
     if (idx === -1) return;
@@ -2050,7 +2011,6 @@ export default function App() {
     };
   }, [wandMask, edgeSegments, wandDimensions, bubbleQueue]);
 
-  // 📝 إدراج النص
   const handleInsertText = () => {
     const lines = parsedLinesRef.current.length > 0 ? parsedLinesRef.current : parsedLines;
     if (lines.length === 0 || currentLineIndex === -1) {
@@ -2234,7 +2194,6 @@ export default function App() {
     setSelectionBox(null);
   };
 
-  // 📐 محاذاة النص
   const handleAlignText = useCallback(() => {
     if (!activeLayerRef.current) {
       addToast('❌ يرجى تحديد طبقة نصية لتعديل محاذاتها الهيكلية', 'error');
@@ -2335,9 +2294,9 @@ export default function App() {
             userCap,
             activeLayerRef.current.style.fontFamily,
             activeLayerRef.current.style.lineHeight,
-            parseFloat(activeLayer.style.letterSpacing) || 0,
+            parseFloat(activeLayerRef.current.style.letterSpacing) || 0,
             bubbleMargin,
-            activeLayer.lineCountOverride,
+            activeLayerRef.current.lineCountOverride,
             true
           );
           newText = wrapRes.lines.join('\n');
@@ -2350,7 +2309,7 @@ export default function App() {
         layerHeight,
         activeLayerRef.current.style.fontFamily,
         activeLayerRef.current.style.lineHeight,
-        parseFloat(activeLayer.style.letterSpacing) || 0
+        parseFloat(activeLayerRef.current.style.letterSpacing) || 0
       );
     }
 
@@ -2639,7 +2598,6 @@ export default function App() {
     e.target.value = '';
   };
 
-  // 🌈 تصدير ومشاركة قوالب تدريج الألوان
   const handleExportGradients = () => {
     if (gradientPresets.length === 0) {
       addToast('⚠️ لا توجد قوالب تدريج محفوظة لتصديرها', 'error');
@@ -2649,7 +2607,6 @@ export default function App() {
     handleShareFile(jsonStr, "text-gradients.json", "مشاركة تدريجات ألوان نصوص تايبر مانجا");
   };
 
-  // 🌈 استيراد قوالب تدريج الألوان
   const handleImportGradients = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2676,7 +2633,6 @@ export default function App() {
     e.target.value = '';
   };
 
-  // 🌈 تطبيق تدريج لوني على الطبقة النشطة والنمط النشط
   const handleApplyGradientToActiveLayer = (gradient: TextGradient | null) => {
     setActiveGradient(gradient);
     updateActiveStyleInFolders({ gradient: gradient || undefined });
@@ -2692,7 +2648,6 @@ export default function App() {
     }
   };
 
-  // 🔍 خوارزمية ذكية لاستخراج التدريج والـ Stroke من التحديد الحالي في صورة المانجا مباشرة
   const handleSampleGradientFromSelection = () => {
     const imgEl = document.getElementById('manga-img') as HTMLImageElement;
     if (!imgEl || !imgEl.naturalWidth) {
@@ -2730,7 +2685,6 @@ export default function App() {
       return;
     }
 
-    // 1. تحديث الألوان المستخرجة
     setTextColor(result.textColor);
     setStrokeColor(result.strokeColor);
     setStrokeWidth(result.strokeWidth);
@@ -2743,7 +2697,6 @@ export default function App() {
     };
     setActiveGradient(newGrad);
 
-    // 2. تطبيق على الطبقة النشطة إن وُجدت
     if (activeLayerRef.current) {
       handleUpdateLayer(activeLayerRef.current.id, {
         style: {
@@ -2756,7 +2709,6 @@ export default function App() {
       });
     }
 
-    // 3. حفظ النمط الجديد تلقائياً في شبكة الستايلات الأيقونية لسهولة استخدامه لاحقاً
     const newPreset: GradientPreset = {
       id: `grad_sample_${Date.now()}`,
       name: `مستخرج ${gradientPresets.length + 1}`,
@@ -2778,7 +2730,6 @@ export default function App() {
     addToast('✓ تم شفط ألوان التدريج والـ Stroke من التحديد وحفظه في الاستايلات! 🎨✨', 'success');
   };
 
-  // 🌈 نسخ تدريج النص من الطبقة النشطة أو التحديد الحالي
   const handleCopyGradientFromActiveLayer = () => {
     if (activeLayerRef.current && activeLayerRef.current.style.gradient && activeLayerRef.current.style.gradient.enabled) {
       setActiveGradient(activeLayerRef.current.style.gradient);
@@ -2786,7 +2737,6 @@ export default function App() {
       return;
     }
 
-    // إذا لم تكن هناك طبقة نصية، ولكن المستخدم يحدد منطقة في الصورة، نشفط منها فوراً!
     if ((selectionBox && selectionBox.visible && selectionBox.width >= 5) || wandDimensions) {
       handleSampleGradientFromSelection();
       return;
@@ -2920,7 +2870,6 @@ export default function App() {
     e.target.value = '';
   };
 
-  // 💾 تطبيق وحفظ التنسيق بما في ذلك الـ Stroke والتدريج
   const handleApplyStyleToActiveLayer = () => {
     const optFs = fontSize === 'auto' ? 'auto' : (parseFloat(fontSize) || 16);
 
@@ -2977,7 +2926,6 @@ export default function App() {
     addToast('✓ تم تطبيق وحفظ التنسيق والحد الخارجي بنجاح 💾', 'success');
   };
 
-  // 🖼️ رسم الطبقات للكانفاس مع دعم كامل للـ Stroke والتدريجات اللونية
   const renderLayerToCanvasBuffer = (
     ctx: CanvasRenderingContext2D,
     layer: MangaLayer,
@@ -3041,7 +2989,6 @@ export default function App() {
       ctx.fillRect(-width / 2, -height / 2, width, height);
     }
 
-    // إعداد تدريج الألوان إن وجد
     let fillStyle: string | CanvasGradient = col;
     if (style.gradient && style.gradient.enabled && style.gradient.colors && style.gradient.colors.length >= 2) {
       const angleRad = ((style.gradient.angle || 90) * Math.PI) / 180;
@@ -3102,7 +3049,6 @@ export default function App() {
     lines.forEach((lineVal, idx) => {
       const yPos = startY + idx * lineH;
 
-      // 🖌️ رسم الـ Stroke الخارجي أولاً حتى لا يتداخل مع تعبئة النص الداخلي
       if (sWidth > 0) {
         ctx.save();
         ctx.strokeStyle = sColor;
@@ -3113,7 +3059,6 @@ export default function App() {
         ctx.restore();
       }
 
-      // رسم ملء النص الداخلي
       ctx.fillText(lineVal, xPos, yPos);
 
       if (style.textDecoration === 'underline') {
@@ -3808,7 +3753,6 @@ export default function App() {
     history,
   ]);
 
-  // 🌟 القائمة تعتمد فقط على الخطوط المرفوعة بدون أي خطوط نظامية دخيلة
   const allFontsList: CustomFont[] = [...customFonts];
 
   const tatweelPreviewText = activeLayer 
@@ -4144,148 +4088,16 @@ export default function App() {
     <div className="w-screen h-screen overflow-x-auto overflow-y-hidden bg-[#121212] antialiased">
       <div className="flex h-full min-w-[1240px] font-sans text-gray-300 relative overflow-hidden">
       
-      {fallbackFile && (
-        <div 
-          className="fixed inset-0 bg-black/90 z-[100000] flex flex-col items-center justify-center p-4 backdrop-blur-md cursor-pointer" 
-          dir="rtl"
-          onClick={() => {
-            if (fallbackFile?.url) {
-              try {
-                URL.revokeObjectURL(fallbackFile.url);
-              } catch (err) {
-                console.error(err);
-              }
-            }
-            setFallbackFile(null);
-          }}
-        >
-          <div 
-            className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-2xl p-5 w-full max-w-sm text-center flex flex-col gap-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 cursor-default"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5 justify-center">
-              <span>🎉 تم تجهيز صورتك بنجاح!</span>
-            </h3>
-            <p className="text-[11px] text-gray-300 leading-relaxed">
-              {Capacitor && Capacitor.isNativePlatform() ? (
-                <>
-                  يرجى استخدام زر <span className="text-green-400 font-bold">"مشاركة وحفظ الصورة"</span> بالأسفل لحفظها مباشرة في معرض الصور بهاتفك 📱💾
-                </>
-              ) : (
-                <>
-                  إذا لم يبدأ التحميل تلقائياً، 
-                  <span className="text-yellow-400 font-bold"> اضغط مطولاً </span> 
-                  على الصورة أدناه ثم اختر 
-                  <span className="text-green-400 font-bold"> "حفظ الصورة" </span> 
-                  أو 
-                  <span className="text-green-400 font-bold"> "إضافة إلى الصور" </span> 
-                  📱💾
-                </>
-              )}
-            </p>
-            <div className="bg-[#151515] border border-[#2d2d2d] rounded-lg p-2 flex items-center justify-center overflow-hidden max-h-[40vh]">
-              <img
-                src={fallbackFile.url}
-                className="max-h-[35vh] max-w-full object-contain rounded shadow-lg pointer-events-auto"
-                style={{
-                  userSelect: 'auto',
-                  WebkitUserSelect: 'auto',
-                  WebkitTouchCallout: 'default'
-                }}
-                alt="Translated page preview"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (!fallbackFile) return;
-
-                  if (Capacitor && Capacitor.isNativePlatform()) {
-                    try {
-                      if (!Filesystem || !Share || !Directory) {
-                        addToast('⚠️ حزم المشاركة غير جاهزة بعد، يرجى المحاولة لاحقاً', 'error');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.readAsDataURL(fallbackFile.blob);
-                      reader.onloadend = async () => {
-                        const base64Data = reader.result as string;
-                        const base64Raw = base64Data.split(',')[1] || base64Data;
-
-                        await Filesystem.writeFile({
-                          path: fallbackFile.filename,
-                          data: base64Raw,
-                          directory: Directory.Cache,
-                        });
-
-                        const fileUriResult = await Filesystem.getUri({
-                          directory: Directory.Cache,
-                          path: fallbackFile.filename,
-                        });
-
-                        await Share.share({
-                          title: fallbackFile.filename,
-                          files: [fileUriResult.uri],
-                        });
-
-                        await Filesystem.deleteFile({
-                          directory: Directory.Cache,
-                          path: fallbackFile.filename,
-                        });
-
-                        addToast('✓ تم استدعاء قائمة المشاركة الأصلية بنجاح 📤', 'success');
-                      };
-                    } catch (nativeErr) {
-                      console.error('Fallback native sharing error:', nativeErr);
-                      addToast('❌ فشل استدعاء المشاركة الأصلية للنظام', 'error');
-                    }
-                    return;
-                  }
-
-                  const file = new File([fallbackFile.blob], fallbackFile.filename, { type: fallbackFile.blob.type });
-                  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                      await navigator.share({
-                        files: [file],
-                        title: fallbackFile.filename,
-                      });
-                      addToast('✓ تم الحفظ والمشاركة بنجاح 📤', 'success');
-                    } catch (err: any) {
-                      if (err.name !== 'AbortError') {
-                        addToast('فشل في فتح نافذة المشاركة، يرجى التحقق من تثبيت مكتبة المشاركة', 'error');
-                      }
-                    }
-                  } else {
-                    addToast('⚠️ نظام أندرويد بحاجة لمكتبة Capacitor Share للاتصال بالمعرض مباشرة', 'error');
-                  }
-                }}
-                className="bg-green-600 text-white hover:bg-green-700 py-2 px-5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span>📤 مشاركة وحفظ الصورة</span>
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (fallbackFile?.url) {
-                    try {
-                      URL.revokeObjectURL(fallbackFile.url);
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }
-                  setFallbackFile(null);
-                }}
-                className="bg-[#2d2d2d] text-gray-300 border border-[#3c3c3c] hover:bg-[#3d3d3d] py-2 px-5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-              >
-                إغلاق النافذة
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🖼️ نافذة المعاينة والحفظ والمشاركة الاحتياطية (مستخرجة كملف منفصل) */}
+      <FallbackShareModal
+        fallbackFile={fallbackFile}
+        onClose={() => setFallbackFile(null)}
+        Capacitor={Capacitor}
+        Filesystem={Filesystem}
+        Share={Share}
+        Directory={Directory}
+        addToast={addToast}
+      />
 
       {/* لوحة التنبيهات المنبثقة */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[999999] flex flex-col gap-2 pointer-events-none">
@@ -4321,7 +4133,7 @@ export default function App() {
         onSelectFont={handleSelectFontFamily}
       />
 
-      {/* 📤 نافذة اختيار الأنماط المنسقة للمشاركة المستخرجة كملف منفصل */}
+      {/* 📤 نافذة تحديد الأنماط لمشاركتها (مستخرجة كملف منفصل) */}
       <ExportSelectorModal
         isOpen={showExportSelectorModal}
         onClose={() => setShowExportSelectorModal(false)}
@@ -4332,7 +4144,7 @@ export default function App() {
         addToast={addToast}
       />
 
-      {/* 🔧 نافذة الإعدادات المقسمة النظيفة */}
+      {/* ⚙️ نافذة الإعدادات المتكاملة (مستخرجة كملف منفصل) */}
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
@@ -4744,7 +4556,7 @@ export default function App() {
         onSelectFont={handleSelectFontFamily}
       />
 
-      {/* ⚙️ نافذة تعديل النمط المستخرجة كملف منفصل */}
+      {/* ⚙️ نافذة تعديل النمط التنسيقي (مستخرجة كملف منفصل) */}
       <EditStyleModal
         editingStyle={editingStyle}
         onClose={() => setEditingStyle(null)}
