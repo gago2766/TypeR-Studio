@@ -277,4 +277,10 @@ export function stepTatweel(
       insertIdx++;
     }
 
-    const tatweel
+    const tatweels = TATWEEL.repeat(stepCount);
+    words[bestWi] = targetWord.slice(0, insertIdx) + tatweels + targetWord.slice(insertIdx);
+    return words.join(' ');
+  });
+
+  return modifiedLines.join('\n');
+}
