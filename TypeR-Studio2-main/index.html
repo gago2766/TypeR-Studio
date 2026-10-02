@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TypeR Studio Pro - النسخة الاحترافية المتكاملة</title>
+    
+    <!-- 🛠️ أداة فحص وقراءة أخطاء الـ Console مباشرة من الهاتف دون كمبيوتر -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
+
+    <!-- 🧠 تحميل محرك ONNX المستقر المباشر للأندرويد لتفادي حظر الموديولات الديناميكية -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
