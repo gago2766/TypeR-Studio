@@ -1,9 +1,0 @@
-{
-  "appId": "com.typer.studio",
-  "appName": "TypeR Studio",
-  "webDir": "dist",
-  "server": {
-    "androidScheme": "https",
-    "cleartext": true
-  }
-}
